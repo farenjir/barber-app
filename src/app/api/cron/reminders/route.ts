@@ -15,20 +15,22 @@ export async function GET(request: Request): Promise<Response> {
     }
     
     const now = new Date();
-    const twentyFourHoursLater = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-    const twoHoursLater = new Date(now.getTime() + 2 * 60 * 60 * 1000);
     
     let sent24h = 0;
     let sent2h = 0;
     
-    // 24-hour reminders (between now and 25 hours from now)
+    // 24-hour reminders: on a daily cron, select appointments 20-28 hours from now
+    // This accommodates the once-per-day run (cron is 30 4 * * * UTC = 08:00 Asia/Tehran)
+    const twentyHoursLater = new Date(now.getTime() + 20 * 60 * 60 * 1000);
+    const twentyEightHoursLater = new Date(now.getTime() + 28 * 60 * 60 * 1000);
+    
     const appointments24h = await sql`
       SELECT a.*, s.name as service_name
       FROM appointments a
       JOIN services s ON a.service_id = s.id
       WHERE a.status = 'confirmed'
-      AND a.appointment_time > ${now.toISOString()}
-      AND a.appointment_time <= ${twentyFourHoursLater.toISOString()}
+      AND a.appointment_time >= ${twentyHoursLater.toISOString()}
+      AND a.appointment_time <= ${twentyEightHoursLater.toISOString()}
       AND NOT EXISTS (
         SELECT 1 FROM sent_reminders
         WHERE appointment_id = a.id
@@ -58,6 +60,9 @@ export async function GET(request: Request): Promise<Response> {
     }
     
     // 2-hour reminders (between now and 2.5 hours from now)
+    // NOTE: On Vercel Hobby (daily cron), this will rarely fire. Only appointments
+    // that happen to be 2 hours away at 08:00 Asia/Tehran will receive this reminder.
+    // On Vercel Pro with a */30 * * * * schedule, this fires reliably every 30 minutes.
     const twoHoursThirtyMinutesLater = new Date(now.getTime() + 2.5 * 60 * 60 * 1000);
     const appointments2h = await sql`
       SELECT a.*, s.name as service_name

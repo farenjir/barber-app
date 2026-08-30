@@ -15,7 +15,7 @@ A production-ready Telegram booking bot for hairdressers/barbers and their custo
 - 📋 **View Bookings** - See all upcoming appointments with status
 - ❌ **Cancel Bookings** - Cancel appointments with admin notification
 - 💇 **Browse Services** - View available services with prices and duration
-- ⏰ **Reminders** - Automatic reminders 24 hours and 2 hours before appointments
+- ⏰ **Reminders** - Automatic 24-hour reminders (daily at 08:00 Asia/Tehran)
 
 ### For Admins | برای مدیران
 - ✅ **Confirm/Reject** - Review and respond to booking requests
@@ -234,10 +234,21 @@ Set these in Vercel dashboard (Settings → Environment Variables):
 
 ### Automatic Reminders
 
-The cron job runs every 30 minutes (configured in `vercel.json`):
-- **24-hour reminders** - Sent 24 hours before confirmed appointments
-- **2-hour reminders** - Sent 2 hours before confirmed appointments
-- **Idempotent** - Each reminder is sent only once
+The reminder system behavior depends on your Vercel plan:
+
+#### Vercel Hobby Plan (Current)
+- **Cron Schedule:** Once daily at `30 4 * * *` (04:30 UTC = 08:00 Asia/Tehran)
+- **24-hour reminders:** Sent to appointments scheduled 20-28 hours from the daily run
+- **2-hour reminders:** Will rarely fire (only if an appointment happens to be exactly 2 hours away at 08:00)
+- **Limitation:** Vercel Hobby only supports daily cron jobs
+
+#### Vercel Pro Plan (Recommended for Full Features)
+- **Cron Schedule:** Every 30 minutes `*/30 * * * *`
+- **24-hour reminders:** Sent reliably 24 hours before confirmed appointments
+- **2-hour reminders:** Sent reliably 2 hours before confirmed appointments
+- **Idempotent:** Each reminder is sent only once
+
+To upgrade to Pro for full reminder features, change the `schedule` in `vercel.json` to `*/30 * * * *` and redeploy.
 
 ---
 
@@ -251,7 +262,7 @@ The cron job runs every 30 minutes (configured in `vercel.json`):
 6. **Confirm** - Review and confirm booking
 7. **Wait for Admin** - Admin receives notification with Confirm/Reject buttons
 8. **Get Confirmation** - Customer receives confirmation message
-9. **Receive Reminders** - Automatic reminders 24h and 2h before appointment
+9. **Receive Reminder** - Automatic reminder ~24 hours before appointment (daily at 08:00 Asia/Tehran)
 
 ---
 
