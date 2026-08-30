@@ -1,0 +1,43 @@
+{
+  "name": "barber-app",
+  "version": "1.0.0",
+  "description": "Telegram booking bot for a hairdresser and their customers.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:migrate": "node --loader ts-node/esm src/db/migrate.ts",
+    "db:seed": "node --loader ts-node/esm src/db/seed.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/farenjir/barber-app.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/farenjir/barber-app/issues"
+  },
+  "homepage": "https://github.com/farenjir/barber-app#readme",
+  "type": "module",
+  "dependencies": {
+    "@chat-adapter/telegram": "^4.39.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
+    "@vercel/postgres": "^0.10.0",
+    "chat": "^4.39.0",
+    "jalaali-js": "^2.0.1",
+    "next": "^16.3.3",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "typescript": "^7.0.2"
+  },
+  "devDependencies": {
+    "@types/node": "^26.4.0",
+    "ts-node": "^10.9.2",
+    "vitest": "^4.1.11"
+  }
+}
