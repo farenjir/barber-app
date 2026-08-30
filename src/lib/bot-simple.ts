@@ -23,6 +23,8 @@ export const bot = new Chat({
   adapters: {
     telegram: createTelegramAdapter({
       mode: 'auto',
+      // Provide dummy token for build time, real token from env at runtime
+      botToken: process.env.TELEGRAM_BOT_TOKEN || 'build-time-dummy-token',
     }),
   },
   state: createPostgresState(),
@@ -43,10 +45,10 @@ bot.onNewMention(async (thread, message) => {
   
   // Show services
   if (text === '/services' || text === 'خدمات') {
-    const services = await sql`SELECT * FROM services WHERE is_active = true ORDER BY name`;
+    const services = await sql`SELECT * FROM services WHERE is_active = true ORDER BY name` as unknown as Service[];
     
     let message = '💇 *خدمات و قیمت‌ها:*\n\n';
-    for (const service of services as Service[]) {
+    for (const service of services) {
       message += `• ${service.name}\n`;
       message += `  مدت: ${service.duration_minutes} دقیقه | قیمت: ${service.price_toman.toLocaleString('fa-IR')} تومان\n\n`;
     }
@@ -73,7 +75,7 @@ bot.onNewMention(async (thread, message) => {
       AND a.appointment_time < ${tomorrow.toISOString()}
       AND a.status IN ('pending', 'confirmed')
       ORDER BY a.appointment_time ASC
-    `;
+    ` as unknown as any[];
     
     if (appointments.length === 0) {
       await thread.post('امروز نوبتی وجود ندارد.');
@@ -81,7 +83,7 @@ bot.onNewMention(async (thread, message) => {
     }
     
     let msg = '📋 *نوبت‌های امروز:*\n\n';
-    for (const appt of appointments as any[]) {
+    for (const appt of appointments) {
       const dateTime = new Date(appt.appointment_time);
       msg += `• ${formatTime(dateTime)} - ${appt.service_name}\n`;
       msg += `  ${appt.customer_name} (${appt.customer_phone})\n`;

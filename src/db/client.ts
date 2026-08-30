@@ -1,10 +1,26 @@
 import { neon } from '@neondatabase/serverless';
 
-if (!process.env.DATABASE_URL) {
-  throw new Error('DATABASE_URL environment variable is required');
+// Lazy initialization: only create client when first used
+let _sql: ReturnType<typeof neon> | undefined;
+
+function getSql() {
+  if (_sql) return _sql;
+  
+  if (!process.env.DATABASE_URL) {
+    throw new Error('DATABASE_URL environment variable is required at runtime');
+  }
+  
+  _sql = neon(process.env.DATABASE_URL);
+  return _sql;
 }
 
-export const sql = neon(process.env.DATABASE_URL);
+// Export a tagged template function that lazily initializes the client
+export const sql = new Proxy((() => {}) as any, {
+  apply(target, thisArg, args: any[]) {
+    const client = getSql();
+    return (client as any)(...args);
+  },
+}) as ReturnType<typeof neon>;
 
 export type Service = {
   id: number;
