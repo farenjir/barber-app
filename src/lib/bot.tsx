@@ -68,11 +68,15 @@ async function clearUserState(userId: string): Promise<void> {
   await stateAdapter.delete(stateKey);
 }
 
-// Main menu
+// Main menu - send plain text first, then buttons
 async function showMainMenu(thread: any) {
+  // Send plain text welcome immediately (don't block on DB)
+  const welcomeText = `${SALON_NAME} 💈\n\n${MESSAGES.welcome(SALON_NAME)}`;
+  await thread.post(welcomeText);
+
+  // Send menu buttons in a second message
   await thread.post(
-    <Card title={`${SALON_NAME} 💈`}>
-      <CardText>{MESSAGES.welcome(SALON_NAME)}</CardText>
+    <Card title="منو اصلی">
       <Actions>
         <Button id="new">📅 رزرو نوبت جدید</Button>
         <Button id="my">📋 نوبت‌های من</Button>
@@ -86,45 +90,80 @@ async function showMainMenu(thread: any) {
 
 // Common handler for both direct messages and mentions
 async function handleIncomingMessage(thread: any, message: any) {
-  // Subscribe to thread so we can receive future messages
-  try {
-    await thread.subscribe();
-  } catch (error) {
-    console.error('Failed to subscribe to thread:', error);
-  }
-
   const text = message.text?.trim().toLowerCase();
   const userId = parseInt(message.author.userId);
 
-  // Admin commands
-  if (isAdmin(userId)) {
-    if (text === '/today') {
-      await handleTodayCommand(thread);
-      return;
+  try {
+    // Admin commands
+    if (isAdmin(userId)) {
+      if (text === '/today') {
+        await handleTodayCommand(thread);
+        return;
+      }
+      if (text === '/week') {
+        await handleWeekCommand(thread);
+        return;
+      }
+      if (text === '/help') {
+        await thread.post(MESSAGES.adminHelp);
+        return;
+      }
     }
-    if (text === '/week') {
-      await handleWeekCommand(thread);
-      return;
+
+    // Default: show menu FIRST (don't block on DB)
+    await showMainMenu(thread);
+
+    // Then subscribe and clear state (background operations)
+    try {
+      await thread.subscribe();
+    } catch (error) {
+      console.error('Failed to subscribe to thread:', error);
     }
-    if (text === '/help') {
-      await thread.post(MESSAGES.adminHelp);
-      return;
+
+    try {
+      await clearUserState(message.author.userId);
+    } catch (error) {
+      console.error('Failed to clear user state:', error);
+    }
+  } catch (error) {
+    console.error('Error in handleIncomingMessage:', error);
+    // Always try to send an error message to the user
+    try {
+      await thread.post('متأسفانه خطایی رخ داد. لطفاً دوباره تلاش کنید یا با پشتیبانی تماس بگیرید.');
+    } catch (postError) {
+      console.error('Failed to send error message:', postError);
     }
   }
-
-  // Default: clear state and show menu
-  await clearUserState(message.author.userId);
-  await showMainMenu(thread);
 }
 
 // Handle direct messages (private chats)
 bot.onDirectMessage(async (thread, message) => {
-  await handleIncomingMessage(thread, message);
+  try {
+    await handleIncomingMessage(thread, message);
+  } catch (error) {
+    console.error('Error in onDirectMessage:', error);
+    // Try to notify user of error
+    try {
+      await thread.post('متأسفانه خطایی رخ داد. لطفاً دوباره /start را ارسال کنید.');
+    } catch (e) {
+      console.error('Failed to send error notification:', e);
+    }
+  }
 });
 
 // Handle @-mentions in groups
 bot.onNewMention(async (thread, message) => {
-  await handleIncomingMessage(thread, message);
+  try {
+    await handleIncomingMessage(thread, message);
+  } catch (error) {
+    console.error('Error in onNewMention:', error);
+    // Try to notify user of error
+    try {
+      await thread.post('متأسفانه خطایی رخ داد. لطفاً دوباره تلاش کنید.');
+    } catch (e) {
+      console.error('Failed to send error notification:', e);
+    }
+  }
 });
 
 // Handle button actions
