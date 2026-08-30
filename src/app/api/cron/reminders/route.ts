@@ -1,6 +1,6 @@
 import { sql } from '@/db/client';
 import type { Appointment, Service } from '@/db/client';
-import { bot } from '@/lib/bot-simple';
+import { bot } from '@/lib/bot';
 import { MESSAGES } from '@/lib/messages';
 import { formatFullJalaliDate, formatTime } from '@/lib/jalali';
 
