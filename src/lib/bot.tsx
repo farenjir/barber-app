@@ -68,34 +68,37 @@ async function clearUserState(userId: string): Promise<void> {
   await stateAdapter.delete(stateKey);
 }
 
-// Main menu - send plain text first, then buttons
+// Main menu - send plain text ONLY (no Cards)
 async function showMainMenu(thread: any) {
-  // Send plain text welcome immediately (don't block on DB)
-  const welcomeText = `${SALON_NAME} 💈\n\n${MESSAGES.welcome(SALON_NAME)}`;
-  await thread.post(welcomeText);
-
-  // Send menu buttons in a second message
-  await thread.post(
-    <Card title="منو اصلی">
-      <Actions>
-        <Button id="new">📅 رزرو نوبت جدید</Button>
-        <Button id="my">📋 نوبت‌های من</Button>
-        <Button id="cancel">❌ لغو نوبت</Button>
-        <Button id="services">💇 خدمات و قیمت‌ها</Button>
-        <Button id="help">❓ راهنما</Button>
-      </Actions>
-    </Card>
-  );
+  console.log('[showMainMenu] Starting...');
+  
+  // Send plain text welcome - absolutely simple, no formatting, no Cards
+  const welcomeText = `${SALON_NAME}\n\nبه ربات رزرو نوبت خوش آمدید!\n\nلطفاً یکی از گزینه‌های زیر را انتخاب کنید:\n\n1️⃣ رزرو نوبت جدید - /new\n2️⃣ نوبت‌های من - /my\n3️⃣ لغو نوبت - /cancel\n4️⃣ خدمات و قیمت‌ها - /services\n5️⃣ راهنما - /help`;
+  
+  console.log('[showMainMenu] About to call thread.post with text:', welcomeText.substring(0, 50));
+  
+  try {
+    const result = await thread.post(welcomeText);
+    console.log('[showMainMenu] thread.post returned:', result);
+  } catch (error) {
+    console.error('[showMainMenu] thread.post threw error:', error);
+    throw error;
+  }
+  
+  console.log('[showMainMenu] Completed');
 }
 
 // Common handler for both direct messages and mentions
 async function handleIncomingMessage(thread: any, message: any) {
+  console.log('[handleIncomingMessage] CALLED - userId:', message.author?.userId, 'text:', message.text);
+  
   const text = message.text?.trim().toLowerCase();
   const userId = parseInt(message.author.userId);
 
   try {
     // Admin commands
     if (isAdmin(userId)) {
+      console.log('[handleIncomingMessage] User is admin');
       if (text === '/today') {
         await handleTodayCommand(thread);
         return;
@@ -111,57 +114,84 @@ async function handleIncomingMessage(thread: any, message: any) {
     }
 
     // Default: show menu FIRST (don't block on DB)
+    console.log('[handleIncomingMessage] Calling showMainMenu...');
     await showMainMenu(thread);
+    console.log('[handleIncomingMessage] showMainMenu completed');
 
     // Then subscribe and clear state (background operations)
+    console.log('[handleIncomingMessage] Starting background operations...');
     try {
       await thread.subscribe();
+      console.log('[handleIncomingMessage] Thread subscribed');
     } catch (error) {
-      console.error('Failed to subscribe to thread:', error);
+      console.error('[handleIncomingMessage] Failed to subscribe to thread:', error);
     }
 
     try {
       await clearUserState(message.author.userId);
+      console.log('[handleIncomingMessage] User state cleared');
     } catch (error) {
-      console.error('Failed to clear user state:', error);
+      console.error('[handleIncomingMessage] Failed to clear user state:', error);
     }
+    
+    console.log('[handleIncomingMessage] Completed successfully');
   } catch (error) {
-    console.error('Error in handleIncomingMessage:', error);
+    console.error('[handleIncomingMessage] CAUGHT ERROR:', error);
+    if (error instanceof Error) {
+      console.error('[handleIncomingMessage] Error name:', error.name);
+      console.error('[handleIncomingMessage] Error message:', error.message);
+      console.error('[handleIncomingMessage] Error stack:', error.stack);
+    }
     // Always try to send an error message to the user
     try {
+      console.log('[handleIncomingMessage] Attempting to send error message to user...');
       await thread.post('متأسفانه خطایی رخ داد. لطفاً دوباره تلاش کنید یا با پشتیبانی تماس بگیرید.');
+      console.log('[handleIncomingMessage] Error message sent');
     } catch (postError) {
-      console.error('Failed to send error message:', postError);
+      console.error('[handleIncomingMessage] Failed to send error message:', postError);
     }
   }
 }
 
 // Handle direct messages (private chats)
 bot.onDirectMessage(async (thread, message) => {
+  console.log('[onDirectMessage] HANDLER CALLED - threadId:', thread?.id, 'messageId:', message?.id);
+  console.log('[onDirectMessage] Message text:', message?.text);
+  console.log('[onDirectMessage] Thread isDM:', thread?.isDM);
+  
   try {
     await handleIncomingMessage(thread, message);
+    console.log('[onDirectMessage] Handler completed successfully');
   } catch (error) {
-    console.error('Error in onDirectMessage:', error);
+    console.error('[onDirectMessage] CAUGHT ERROR:', error);
+    if (error instanceof Error) {
+      console.error('[onDirectMessage] Error details:', error.name, error.message, error.stack);
+    }
     // Try to notify user of error
     try {
+      console.log('[onDirectMessage] Sending error notification to user...');
       await thread.post('متأسفانه خطایی رخ داد. لطفاً دوباره /start را ارسال کنید.');
+      console.log('[onDirectMessage] Error notification sent');
     } catch (e) {
-      console.error('Failed to send error notification:', e);
+      console.error('[onDirectMessage] Failed to send error notification:', e);
     }
   }
 });
 
 // Handle @-mentions in groups
 bot.onNewMention(async (thread, message) => {
+  console.log('[onNewMention] HANDLER CALLED - threadId:', thread?.id, 'messageId:', message?.id);
+  
   try {
     await handleIncomingMessage(thread, message);
+    console.log('[onNewMention] Handler completed successfully');
   } catch (error) {
-    console.error('Error in onNewMention:', error);
+    console.error('[onNewMention] CAUGHT ERROR:', error);
     // Try to notify user of error
     try {
       await thread.post('متأسفانه خطایی رخ داد. لطفاً دوباره تلاش کنید.');
     } catch (e) {
-      console.error('Failed to send error notification:', e);
+      console.error('[onNewMention] Failed to send error notification:', e);
     }
   }
 });
