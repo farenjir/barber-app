@@ -84,8 +84,15 @@ async function showMainMenu(thread: any) {
   );
 }
 
-// Handle /start and unknown text
-bot.onNewMention(async (thread, message) => {
+// Common handler for both direct messages and mentions
+async function handleIncomingMessage(thread: any, message: any) {
+  // Subscribe to thread so we can receive future messages
+  try {
+    await thread.subscribe();
+  } catch (error) {
+    console.error('Failed to subscribe to thread:', error);
+  }
+
   const text = message.text?.trim().toLowerCase();
   const userId = parseInt(message.author.userId);
 
@@ -108,6 +115,16 @@ bot.onNewMention(async (thread, message) => {
   // Default: clear state and show menu
   await clearUserState(message.author.userId);
   await showMainMenu(thread);
+}
+
+// Handle direct messages (private chats)
+bot.onDirectMessage(async (thread, message) => {
+  await handleIncomingMessage(thread, message);
+});
+
+// Handle @-mentions in groups
+bot.onNewMention(async (thread, message) => {
+  await handleIncomingMessage(thread, message);
 });
 
 // Handle button actions
