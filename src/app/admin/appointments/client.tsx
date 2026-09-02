@@ -1,6 +1,6 @@
 'use client';
 
-import { Table, Paper, Select, Button, Group, Badge } from '@mantine/core';
+import { Table, Paper, Select, Button, Group, Badge, Text, Stack } from '@mantine/core';
 import { IconCalendar } from '@tabler/icons-react';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -104,11 +104,9 @@ export default function AppointmentsClient({ appointments, barbers, filters }: A
             value={from}
             onChange={(val) => setFrom(val || '')}
           />
-          <div className="flex items-end">
-            <Button onClick={handleFilter} fullWidth>
-              اعمال فیلتر
-            </Button>
-          </div>
+          <Button onClick={handleFilter} fullWidth style={{ alignSelf: 'flex-end' }}>
+            اعمال فیلتر
+          </Button>
         </Group>
       </Paper>
 
@@ -127,9 +125,11 @@ export default function AppointmentsClient({ appointments, barbers, filters }: A
           <Table.Tbody>
             {appointments.length === 0 ? (
               <Table.Tr>
-                <Table.Td colSpan={6} className="text-center py-12">
-                  <IconCalendar size={48} className="mx-auto mb-4 opacity-50" />
-                  <p className="text-gray-500">نوبتی یافت نشد</p>
+                <Table.Td colSpan={6}>
+                  <Stack align="center" gap="md" py="xl">
+                    <IconCalendar size={48} opacity={0.5} />
+                    <Text c="dimmed">نوبتی یافت نشد</Text>
+                  </Stack>
                 </Table.Td>
               </Table.Tr>
             ) : (

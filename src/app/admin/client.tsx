@@ -65,27 +65,35 @@ export default function AdminDashboardClient({ stats }: { stats: AdminStats }) {
 
       <SimpleGrid cols={{ base: 2, sm: 4 }} spacing="md">
         <Link href="/admin/barbers">
-          <Paper p="lg" withBorder className="hover:bg-gray-800 transition-colors text-center">
-            <IconScissors size={32} className="mx-auto mb-2" />
-            <Text size="sm" fw={600}>آرایشگران</Text>
+          <Paper p="lg" withBorder style={{ textAlign: 'center', cursor: 'pointer' }}>
+            <Stack align="center" gap="xs">
+              <IconScissors size={32} />
+              <Text size="sm" fw={600}>آرایشگران</Text>
+            </Stack>
           </Paper>
         </Link>
         <Link href="/admin/appointments">
-          <Paper p="lg" withBorder className="hover:bg-gray-800 transition-colors text-center">
-            <IconCalendar size={32} className="mx-auto mb-2" />
-            <Text size="sm" fw={600}>نوبت‌ها</Text>
+          <Paper p="lg" withBorder style={{ textAlign: 'center', cursor: 'pointer' }}>
+            <Stack align="center" gap="xs">
+              <IconCalendar size={32} />
+              <Text size="sm" fw={600}>نوبت‌ها</Text>
+            </Stack>
           </Paper>
         </Link>
         <Link href="/admin/customers">
-          <Paper p="lg" withBorder className="hover:bg-gray-800 transition-colors text-center">
-            <IconUsers size={32} className="mx-auto mb-2" />
-            <Text size="sm" fw={600}>مشتریان</Text>
+          <Paper p="lg" withBorder style={{ textAlign: 'center', cursor: 'pointer' }}>
+            <Stack align="center" gap="xs">
+              <IconUsers size={32} />
+              <Text size="sm" fw={600}>مشتریان</Text>
+            </Stack>
           </Paper>
         </Link>
         <Link href="/admin/settings">
-          <Paper p="lg" withBorder className="hover:bg-gray-800 transition-colors text-center">
-            <IconSettings size={32} className="mx-auto mb-2" />
-            <Text size="sm" fw={600}>تنظیمات</Text>
+          <Paper p="lg" withBorder style={{ textAlign: 'center', cursor: 'pointer' }}>
+            <Stack align="center" gap="xs">
+              <IconSettings size={32} />
+              <Text size="sm" fw={600}>تنظیمات</Text>
+            </Stack>
           </Paper>
         </Link>
       </SimpleGrid>
@@ -113,13 +121,13 @@ export default function AdminDashboardClient({ stats }: { stats: AdminStats }) {
                       <Text fw={600}>{appt.customer_name}</Text>
                       <Text size="sm" c="dimmed">{appt.barber_name}</Text>
                     </div>
-                    <div className="text-left">
+                    <Stack gap="xs" align="flex-start">
                       <Badge color={appt.status === 'confirmed' ? 'green' : appt.status === 'pending' ? 'orange' : 'red'}>
                         {appt.status === 'confirmed' ? 'تأیید شده' : appt.status === 'pending' ? 'در انتظار' : 'لغو شده'}
                       </Badge>
                       <Text size="sm" mt="xs">{date} {time}</Text>
                       <Text size="xs" c="dimmed">{appt.service_name}</Text>
-                    </div>
+                    </Stack>
                   </Group>
                 </Paper>
               );

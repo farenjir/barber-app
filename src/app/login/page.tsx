@@ -41,8 +41,8 @@ export default async function LoginPage({
               <Text c="dimmed">برای ورود، لینک دسترسی را از ربات تلگرام دریافت کنید.</Text>
             )}
 
-            <Paper bg="orange.0" p="lg" radius="md" withBorder mt="md" style={{ borderColor: 'var(--mantine-color-orange-2)' }}>
-              <Text fw={600} size="lg" mb="md" c="orange.9">راهنمای ورود</Text>
+            <Paper bg="orange.1" p="lg" radius="md" withBorder mt="md">
+              <Text fw={600} size="lg" mb="md" c="orange">راهنمای ورود</Text>
               <List spacing="sm" ta="right">
                 <List.Item>به ربات تلگرام مراجعه کنید</List.Item>
                 <List.Item>

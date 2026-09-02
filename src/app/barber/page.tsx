@@ -3,7 +3,7 @@ import { sql } from '@/db/client';
 import { getTehranDayStart, getTehranNextDayStart, addTehranDays } from '@/lib/tehran-time';
 import { ensureBarberCode } from '@/lib/auth';
 import { AppShell } from '@/components/MantineAppShell';
-import { Title, Text } from '@mantine/core';
+import { Title, Text, Center, Stack } from '@mantine/core';
 import BarberDashboardClient from './client';
 
 export const dynamic = 'force-dynamic';
@@ -85,12 +85,12 @@ export default async function BarberDashboard() {
 
   if (!data) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-6">
-        <div className="p-8 text-center">
-          <Title order={2} c="red" mb="md">خطا</Title>
+      <Center style={{ minHeight: '100vh' }} p="xl">
+        <Stack gap="md" ta="center">
+          <Title order={2} c="red">خطا</Title>
           <Text>شما به عنوان آرایشگر ثبت نشده‌اید.</Text>
-        </div>
-      </div>
+        </Stack>
+      </Center>
     );
   }
 
