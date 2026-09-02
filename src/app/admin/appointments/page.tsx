@@ -21,46 +21,180 @@ export default async function AdminAppointments({
     ORDER BY b.display_name
   ` as any[];
   
-  let query = sql`
-    SELECT 
-      a.*,
-      s.name as service_name,
-      b.display_name as barber_name
-    FROM appointments a
-    JOIN services s ON a.service_id = s.id
-    JOIN barbers b ON a.barber_id = b.id
-    WHERE 1=1
-  `;
+  const barberId = params.barber ? parseInt(params.barber) : null;
+  const status = params.status || null;
   
-  const conditions: any[] = [];
+  let appointments: any[];
   
-  if (params.barber) {
-    conditions.push(sql`AND a.barber_id = ${parseInt(params.barber)}`);
-  }
-  
-  if (params.status) {
-    conditions.push(sql`AND a.status = ${params.status}`);
-  }
-  
-  if (params.from === 'upcoming') {
-    const now = new Date();
-    conditions.push(sql`AND a.appointment_time >= ${now.toISOString()}`);
+  if (!params.barber && !params.status && !params.from) {
+    appointments = await sql`
+      SELECT 
+        a.*,
+        s.name as service_name,
+        b.display_name as barber_name
+      FROM appointments a
+      JOIN services s ON a.service_id = s.id
+      JOIN barbers b ON a.barber_id = b.id
+      ORDER BY a.appointment_time DESC 
+      LIMIT 100
+    ` as any[];
+  } else if (params.from === 'upcoming') {
+    const now = new Date().toISOString();
+    if (barberId && status) {
+      appointments = await sql`
+        SELECT a.*, s.name as service_name, b.display_name as barber_name
+        FROM appointments a
+        JOIN services s ON a.service_id = s.id
+        JOIN barbers b ON a.barber_id = b.id
+        WHERE a.barber_id = ${barberId} AND a.status = ${status} AND a.appointment_time >= ${now}
+        ORDER BY a.appointment_time DESC LIMIT 100
+      ` as any[];
+    } else if (barberId) {
+      appointments = await sql`
+        SELECT a.*, s.name as service_name, b.display_name as barber_name
+        FROM appointments a
+        JOIN services s ON a.service_id = s.id
+        JOIN barbers b ON a.barber_id = b.id
+        WHERE a.barber_id = ${barberId} AND a.appointment_time >= ${now}
+        ORDER BY a.appointment_time DESC LIMIT 100
+      ` as any[];
+    } else if (status) {
+      appointments = await sql`
+        SELECT a.*, s.name as service_name, b.display_name as barber_name
+        FROM appointments a
+        JOIN services s ON a.service_id = s.id
+        JOIN barbers b ON a.barber_id = b.id
+        WHERE a.status = ${status} AND a.appointment_time >= ${now}
+        ORDER BY a.appointment_time DESC LIMIT 100
+      ` as any[];
+    } else {
+      appointments = await sql`
+        SELECT a.*, s.name as service_name, b.display_name as barber_name
+        FROM appointments a
+        JOIN services s ON a.service_id = s.id
+        JOIN barbers b ON a.barber_id = b.id
+        WHERE a.appointment_time >= ${now}
+        ORDER BY a.appointment_time DESC LIMIT 100
+      ` as any[];
+    }
   } else if (params.from === 'past') {
-    const now = new Date();
-    conditions.push(sql`AND a.appointment_time < ${now.toISOString()}`);
+    const now = new Date().toISOString();
+    if (barberId && status) {
+      appointments = await sql`
+        SELECT a.*, s.name as service_name, b.display_name as barber_name
+        FROM appointments a
+        JOIN services s ON a.service_id = s.id
+        JOIN barbers b ON a.barber_id = b.id
+        WHERE a.barber_id = ${barberId} AND a.status = ${status} AND a.appointment_time < ${now}
+        ORDER BY a.appointment_time DESC LIMIT 100
+      ` as any[];
+    } else if (barberId) {
+      appointments = await sql`
+        SELECT a.*, s.name as service_name, b.display_name as barber_name
+        FROM appointments a
+        JOIN services s ON a.service_id = s.id
+        JOIN barbers b ON a.barber_id = b.id
+        WHERE a.barber_id = ${barberId} AND a.appointment_time < ${now}
+        ORDER BY a.appointment_time DESC LIMIT 100
+      ` as any[];
+    } else if (status) {
+      appointments = await sql`
+        SELECT a.*, s.name as service_name, b.display_name as barber_name
+        FROM appointments a
+        JOIN services s ON a.service_id = s.id
+        JOIN barbers b ON a.barber_id = b.id
+        WHERE a.status = ${status} AND a.appointment_time < ${now}
+        ORDER BY a.appointment_time DESC LIMIT 100
+      ` as any[];
+    } else {
+      appointments = await sql`
+        SELECT a.*, s.name as service_name, b.display_name as barber_name
+        FROM appointments a
+        JOIN services s ON a.service_id = s.id
+        JOIN barbers b ON a.barber_id = b.id
+        WHERE a.appointment_time < ${now}
+        ORDER BY a.appointment_time DESC LIMIT 100
+      ` as any[];
+    }
   } else if (params.from === 'today') {
-    const today = getTehranDayStart();
-    const tomorrow = addTehranDays(today, 1);
-    conditions.push(sql`AND a.appointment_time >= ${today.toISOString()} AND a.appointment_time < ${tomorrow.toISOString()}`);
+    const today = getTehranDayStart().toISOString();
+    const tomorrow = addTehranDays(getTehranDayStart(), 1).toISOString();
+    if (barberId && status) {
+      appointments = await sql`
+        SELECT a.*, s.name as service_name, b.display_name as barber_name
+        FROM appointments a
+        JOIN services s ON a.service_id = s.id
+        JOIN barbers b ON a.barber_id = b.id
+        WHERE a.barber_id = ${barberId} AND a.status = ${status} 
+          AND a.appointment_time >= ${today} AND a.appointment_time < ${tomorrow}
+        ORDER BY a.appointment_time DESC LIMIT 100
+      ` as any[];
+    } else if (barberId) {
+      appointments = await sql`
+        SELECT a.*, s.name as service_name, b.display_name as barber_name
+        FROM appointments a
+        JOIN services s ON a.service_id = s.id
+        JOIN barbers b ON a.barber_id = b.id
+        WHERE a.barber_id = ${barberId} AND a.appointment_time >= ${today} AND a.appointment_time < ${tomorrow}
+        ORDER BY a.appointment_time DESC LIMIT 100
+      ` as any[];
+    } else if (status) {
+      appointments = await sql`
+        SELECT a.*, s.name as service_name, b.display_name as barber_name
+        FROM appointments a
+        JOIN services s ON a.service_id = s.id
+        JOIN barbers b ON a.barber_id = b.id
+        WHERE a.status = ${status} AND a.appointment_time >= ${today} AND a.appointment_time < ${tomorrow}
+        ORDER BY a.appointment_time DESC LIMIT 100
+      ` as any[];
+    } else {
+      appointments = await sql`
+        SELECT a.*, s.name as service_name, b.display_name as barber_name
+        FROM appointments a
+        JOIN services s ON a.service_id = s.id
+        JOIN barbers b ON a.barber_id = b.id
+        WHERE a.appointment_time >= ${today} AND a.appointment_time < ${tomorrow}
+        ORDER BY a.appointment_time DESC LIMIT 100
+      ` as any[];
+    }
+  } else {
+    if (barberId && status) {
+      appointments = await sql`
+        SELECT a.*, s.name as service_name, b.display_name as barber_name
+        FROM appointments a
+        JOIN services s ON a.service_id = s.id
+        JOIN barbers b ON a.barber_id = b.id
+        WHERE a.barber_id = ${barberId} AND a.status = ${status}
+        ORDER BY a.appointment_time DESC LIMIT 100
+      ` as any[];
+    } else if (barberId) {
+      appointments = await sql`
+        SELECT a.*, s.name as service_name, b.display_name as barber_name
+        FROM appointments a
+        JOIN services s ON a.service_id = s.id
+        JOIN barbers b ON a.barber_id = b.id
+        WHERE a.barber_id = ${barberId}
+        ORDER BY a.appointment_time DESC LIMIT 100
+      ` as any[];
+    } else if (status) {
+      appointments = await sql`
+        SELECT a.*, s.name as service_name, b.display_name as barber_name
+        FROM appointments a
+        JOIN services s ON a.service_id = s.id
+        JOIN barbers b ON a.barber_id = b.id
+        WHERE a.status = ${status}
+        ORDER BY a.appointment_time DESC LIMIT 100
+      ` as any[];
+    } else {
+      appointments = await sql`
+        SELECT a.*, s.name as service_name, b.display_name as barber_name
+        FROM appointments a
+        JOIN services s ON a.service_id = s.id
+        JOIN barbers b ON a.barber_id = b.id
+        ORDER BY a.appointment_time DESC LIMIT 100
+      ` as any[];
+    }
   }
-  
-  if (conditions.length > 0) {
-    query = sql`${query} ${sql(conditions.map(c => c.strings[0]).join(' '))}`;
-  }
-  
-  query = sql`${query} ORDER BY a.appointment_time DESC LIMIT 100`;
-  
-  const appointments = await query as any[];
 
   return (
     <AppShell
