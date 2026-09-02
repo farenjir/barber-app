@@ -9,6 +9,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "db:migrate": "node --loader ts-node/esm src/db/migrate.ts",
+    "db:migrate:data": "node --loader ts-node/esm src/db/migrate-data.ts",
     "db:seed": "node --loader ts-node/esm src/db/seed.ts"
   },
   "repository": {

@@ -1,8 +1,23 @@
 import { sql } from '@/db/client';
-import type { Appointment, Service } from '@/db/client';
-import { bot } from '@/lib/bot';
+import type { Appointment } from '@/db/client';
 import { MESSAGES } from '@/lib/messages';
 import { formatFullJalaliDate, formatTime } from '@/lib/jalali';
+
+const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN!;
+const TELEGRAM_API = `https://api.telegram.org/bot${BOT_TOKEN}`;
+
+async function sendMessage(chatId: number, text: string): Promise<void> {
+  const response = await fetch(`${TELEGRAM_API}/sendMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ chat_id: chatId, text }),
+  });
+
+  if (!response.ok) {
+    const result = await response.json();
+    throw new Error(`Failed to send message: ${JSON.stringify(result)}`);
+  }
+}
 
 export async function GET(request: Request): Promise<Response> {
   try {
@@ -43,8 +58,7 @@ export async function GET(request: Request): Promise<Response> {
         const dateTime = new Date(appt.appointment_time);
         const dateTimeStr = `${formatFullJalaliDate(dateTime)} - ${formatTime(dateTime)}`;
         
-        const customerThread = bot.channel(`telegram:${appt.customer_telegram_id}`);
-        await customerThread.post(MESSAGES.reminder24h(appt.service_name, dateTimeStr));
+        await sendMessage(appt.customer_telegram_id, MESSAGES.reminder24h(appt.service_name, dateTimeStr));
         
         // Mark as sent
         await sql`
@@ -83,8 +97,7 @@ export async function GET(request: Request): Promise<Response> {
         const dateTime = new Date(appt.appointment_time);
         const dateTimeStr = `${formatFullJalaliDate(dateTime)} - ${formatTime(dateTime)}`;
         
-        const customerThread = bot.channel(`telegram:${appt.customer_telegram_id}`);
-        await customerThread.post(MESSAGES.reminder2h(appt.service_name, dateTimeStr));
+        await sendMessage(appt.customer_telegram_id, MESSAGES.reminder2h(appt.service_name, dateTimeStr));
         
         // Mark as sent
         await sql`
