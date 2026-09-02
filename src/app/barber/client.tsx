@@ -21,7 +21,7 @@ export default function BarberDashboardClient({ data }: { data: BarberDashboardD
     <Stack>
       {/* Barber Code Card */}
       {data.barber.public_code && (
-        <Paper p="md" withBorder bg="orange" c="white">
+        <Paper p="md" withBorder>
           <Stack gap="md">
             <Group justify="space-between" wrap="wrap">
               <Group>
@@ -33,27 +33,26 @@ export default function BarberDashboardClient({ data }: { data: BarberDashboardD
               </Group>
               <CopyButton value={data.barber.public_code}>
                 {({ copied, copy }) => (
-                  <ActionIcon color={copied ? 'teal' : 'gray'} onClick={copy} size="lg" variant="filled">
-                    {copied ? <IconCheck size={20} /> : <IconCopy size={20} />}
-                  </ActionIcon>
+                  <Group gap="xs">
+                    <Text size="sm">{copied ? 'کپی شد!' : 'کپی کد'}</Text>
+                    <ActionIcon color={copied ? 'teal' : 'gray'} onClick={copy} size="lg" variant="light">
+                      {copied ? <IconCheck size={20} /> : <IconCopy size={20} />}
+                    </ActionIcon>
+                  </Group>
                 )}
               </CopyButton>
             </Group>
             
-            <Group justify="space-between" wrap="wrap" align="center">
-              <div style={{ flex: 1, minWidth: 200 }}>
-                <Text size="xs" c="dimmed" mb={4}>لینک دعوت</Text>
-                <Link href={inviteLink} target="_blank" style={{ textDecoration: 'underline' }}>
-                  <Text size="sm" inherit style={{ wordBreak: 'break-all' }}>
-                    {inviteLink}
-                  </Text>
-                </Link>
-              </div>
+            <Group justify="space-between" wrap="wrap">
+              <Text size="xs" c="dimmed">لینک دعوت تلگرام</Text>
               <CopyButton value={inviteLink}>
                 {({ copied, copy }) => (
-                  <ActionIcon color={copied ? 'teal' : 'gray'} onClick={copy} size="lg" variant="filled">
-                    {copied ? <IconCheck size={20} /> : <IconCopy size={20} />}
-                  </ActionIcon>
+                  <Group gap="xs">
+                    <Text size="sm">{copied ? 'کپی شد!' : 'لینک دعوت'}</Text>
+                    <ActionIcon color={copied ? 'teal' : 'gray'} onClick={copy} size="lg" variant="light">
+                      {copied ? <IconCheck size={20} /> : <IconCopy size={20} />}
+                    </ActionIcon>
+                  </Group>
                 )}
               </CopyButton>
             </Group>
