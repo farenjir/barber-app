@@ -1,6 +1,7 @@
 import { requireBarber } from '@/lib/auth-server';
 import { sql } from '@/db/client';
 import { AppShell } from '@/components/MantineAppShell';
+import { Text } from '@mantine/core';
 import HoursClient from './client';
 
 export const dynamic = 'force-dynamic';
@@ -26,7 +27,7 @@ export default async function BarberHours() {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
         <div className="p-8 text-center">
-          <p className="text-red-600">شما به عنوان آرایشگر ثبت نشده‌اید.</p>
+          <Text c="red">شما به عنوان آرایشگر ثبت نشده‌اید.</Text>
         </div>
       </div>
     );
@@ -51,6 +52,7 @@ export default async function BarberHours() {
       userRole="barber"
       barberName={barber[0].display_name}
       pageTitle="ساعات کاری"
+      isSuperAdmin={user.role === 'super_admin'}
     >
       <HoursClient barberId={barberId} weekdays={WEEKDAYS} hoursArray={hoursArray} />
     </AppShell>

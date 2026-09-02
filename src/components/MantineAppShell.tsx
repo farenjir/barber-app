@@ -16,6 +16,7 @@ interface AppShellProps {
   userRole: 'barber' | 'super_admin';
   barberName?: string;
   pageTitle: string;
+  isSuperAdmin?: boolean;
 }
 
 const barberLinks = [
@@ -36,7 +37,7 @@ const adminLinks = [
   { href: '/admin/settings', label: 'تنظیمات', icon: IconSettings },
 ];
 
-export function AppShell({ children, userName, userRole, barberName, pageTitle }: AppShellProps) {
+export function AppShell({ children, userName, userRole, barberName, pageTitle, isSuperAdmin }: AppShellProps) {
   const [opened, { toggle }] = useDisclosure();
   const pathname = usePathname();
   const links = userRole === 'barber' ? barberLinks : adminLinks;
@@ -69,6 +70,17 @@ export function AppShell({ children, userName, userRole, barberName, pageTitle }
         </MantineAppShell.Section>
 
         <MantineAppShell.Section grow mt="md">
+          {isSuperAdmin && userRole === 'barber' && (
+            <NavLink
+              component={Link}
+              href="/admin"
+              label="بازگشت به داشبورد ادمین"
+              leftSection={<IconLayoutDashboard size={20} stroke={1.5} />}
+              mb="md"
+              variant="light"
+              color="blue"
+            />
+          )}
           {links.map((link) => (
             <NavLink
               key={link.href}
