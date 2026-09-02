@@ -1,0 +1,25 @@
+---
+description: Time zone and calendar system
+globs:
+  - "src/lib/jalali.ts"
+  - "src/lib/tehran-time.ts"
+  - "src/app/barber/calendar/**"
+---
+
+## Time Zone
+
+- All times in **Asia/Tehran** timezone
+- Use `src/lib/tehran-time.ts` for conversions
+- Database stores UTC, display converts to Tehran time
+
+## Calendar System
+
+- **Jalali (Persian) calendar** for UI display
+- Use `jalaali-js` library
+- Helper functions in `src/lib/jalali.ts`
+- Week starts on **Saturday** (Persian convention)
+
+## Date Libraries
+
+- `dayjs` for date manipulation
+- `@mantine/dates` for date pickers (with Jalali conversion)

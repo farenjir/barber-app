@@ -1,0 +1,24 @@
+---
+description: Telegram bot integration rules
+globs:
+  - "src/app/api/webhooks/telegram/**"
+  - "src/lib/messages.ts"
+---
+
+## Raw Telegram Bot API Only
+
+- Use raw Bot API webhook at `src/app/api/webhooks/telegram/route.ts`
+- Direct `fetch` to `https://api.telegram.org/bot{token}/...`
+- Message templates in `src/lib/messages.ts`
+
+## Forbidden
+
+- ❌ Do NOT reintroduce Vercel Chat SDK
+- ❌ Do NOT add `@chat-adapter/telegram`
+- ❌ Do NOT import from `@vercel/ai`
+
+## Customer Access
+
+- Customers book via Telegram bot only (no web UI for customers)
+- Barbers and admins use web panels
+- Customers access barber via `/start` parameter with barber code

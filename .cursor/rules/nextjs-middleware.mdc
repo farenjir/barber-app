@@ -1,0 +1,17 @@
+---
+description: Next.js middleware configuration
+globs:
+  - "src/middleware.ts"
+---
+
+## Middleware Filename
+
+- **Keep filename as `src/middleware.ts`**
+- Do NOT rename to `proxy.ts` even if Next.js 16+ suggests migration
+- Export function must be: `export async function middleware(request: NextRequest)`
+
+## Purpose
+
+- Auth checks (magic link tokens, cookies)
+- Route protection (`/barber/*`, `/admin/*`)
+- Role-based access control
