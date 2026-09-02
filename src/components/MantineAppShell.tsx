@@ -39,7 +39,7 @@ const adminLinks = [
 ];
 
 export function AppShell({ children, userName, userRole, barberName, pageTitle, isSuperAdmin }: AppShellProps) {
-  const [opened, { toggle }] = useDisclosure();
+  const [opened, { toggle, close }] = useDisclosure();
   const pathname = usePathname();
   const links = userRole === 'barber' ? barberLinks : adminLinks;
   const { setColorScheme } = useMantineColorScheme();
@@ -58,12 +58,13 @@ export function AppShell({ children, userName, userRole, barberName, pageTitle, 
         collapsed: { mobile: !opened },
       }}
       padding="md"
-      navbar-position="right"
     >
       <MantineAppShell.Header>
-        <Group h="100%" px="md" justify="space-between">
-          <Title order={2}>{pageTitle}</Title>
-          <Group gap="xs">
+        <Group h="100%" px="md" justify="space-between" wrap="nowrap" gap="md">
+          <Title order={2} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 1 }}>
+            {pageTitle}
+          </Title>
+          <Group gap="xs" style={{ flexShrink: 0 }}>
             <ActionIcon
               onClick={toggleColorScheme}
               variant="subtle"
@@ -76,7 +77,13 @@ export function AppShell({ children, userName, userRole, barberName, pageTitle, 
                 <IconMoon size={20} stroke={1.5} />
               )}
             </ActionIcon>
-            <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
+            <Burger 
+              opened={opened} 
+              onClick={toggle} 
+              hiddenFrom="sm" 
+              size="sm" 
+              aria-label="منو"
+            />
           </Group>
         </Group>
       </MantineAppShell.Header>
@@ -100,6 +107,7 @@ export function AppShell({ children, userName, userRole, barberName, pageTitle, 
               mb="md"
               variant="light"
               color="blue"
+              onClick={close}
             />
           )}
           {links.map((link) => (
@@ -110,6 +118,7 @@ export function AppShell({ children, userName, userRole, barberName, pageTitle, 
               label={link.label}
               leftSection={<link.icon size={20} stroke={1.5} />}
               active={pathname === link.href}
+              onClick={close}
             />
           ))}
         </MantineAppShell.Section>
@@ -122,6 +131,7 @@ export function AppShell({ children, userName, userRole, barberName, pageTitle, 
               label="پنل آرایشگر"
               leftSection={<IconScissors size={20} stroke={1.5} />}
               mb="xs"
+              onClick={close}
             />
           )}
           <form action="/api/logout" method="POST">
