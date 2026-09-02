@@ -2,6 +2,13 @@ import { requireBarber } from '@/lib/auth-server';
 import { sql } from '@/db/client';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { AppShell } from '@/components/AppShell';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { Scissors, Clock, DollarSign, X, Plus } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -59,16 +66,15 @@ export default async function BarberServices({
 }) {
   const user = await requireBarber();
   
-  // Get barber ID
   const barber = await sql`
-    SELECT id FROM barbers WHERE user_id = ${user.id}
+    SELECT id, display_name FROM barbers WHERE user_id = ${user.id}
   ` as any[];
   
   if (barber.length === 0) {
     return (
-      <div dir="rtl" className="min-h-screen bg-gray-50 p-4">
-        <div className="max-w-4xl mx-auto bg-white p-8 rounded-lg shadow-md text-center">
-          <p className="text-red-600">شما به عنوان آرایشگر ثبت نشده‌اید.</p>
+      <div className="min-h-screen flex items-center justify-center p-6 bg-background">
+        <div className="bg-card border border-border rounded-lg p-8 shadow-lg text-center">
+          <p className="text-destructive">شما به عنوان آرایشگر ثبت نشده‌اید.</p>
         </div>
       </div>
     );
@@ -82,7 +88,6 @@ export default async function BarberServices({
     ORDER BY is_active DESC, name ASC
   ` as any[];
   
-  // Get service to edit
   let editService = null;
   if (searchParams.edit) {
     const editId = parseInt(searchParams.edit);
@@ -94,139 +99,146 @@ export default async function BarberServices({
   const toggleAction = toggleService.bind(null, barberId as any) as any;
 
   return (
-    <div dir="rtl" className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-gray-800">مدیریت خدمات</h1>
-          <Link href="/barber" className="text-blue-600 hover:text-blue-800">بازگشت</Link>
-        </div>
-      </header>
-      
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        {/* Add/Edit Form */}
-        {(searchParams.add || editService) && (
-          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold">
+    <AppShell
+      userName={user.name}
+      userRole="barber"
+      barberName={barber[0].display_name}
+      pageTitle="مدیریت خدمات"
+    >
+      {(searchParams.add || editService) && (
+        <Card className="mb-6">
+          <CardHeader>
+            <div className="flex justify-between items-center">
+              <CardTitle>
                 {editService ? 'ویرایش خدمت' : 'افزودن خدمت جدید'}
-              </h2>
-              <Link href="/barber/services" className="text-gray-600 hover:text-gray-800">
-                ✕
+              </CardTitle>
+              <Link href="/barber/services">
+                <Button variant="ghost" size="icon">
+                  <X className="w-5 h-5" />
+                </Button>
               </Link>
             </div>
-            
-            <form action={editService ? updateAction : createAction}>
+          </CardHeader>
+          <CardContent>
+            <form action={editService ? updateAction : createAction} className="space-y-4">
               {editService && (
                 <input type="hidden" name="id" value={editService.id} />
               )}
               
-              <div className="space-y-4">
+              <div>
+                <Label htmlFor="name">نام خدمت</Label>
+                <Input
+                  type="text"
+                  id="name"
+                  name="name"
+                  defaultValue={editService?.name}
+                  placeholder="مثال: اصلاح مو"
+                  required
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-semibold mb-1">نام خدمت</label>
-                  <input
-                    type="text"
-                    name="name"
-                    defaultValue={editService?.name}
+                  <Label htmlFor="duration">مدت زمان (دقیقه)</Label>
+                  <Input
+                    type="number"
+                    id="duration"
+                    name="duration"
+                    defaultValue={editService?.duration_minutes}
+                    placeholder="45"
+                    min="1"
                     required
-                    className="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500"
-                    placeholder="مثال: اصلاح مو"
                   />
                 </div>
                 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-semibold mb-1">مدت زمان (دقیقه)</label>
-                    <input
-                      type="number"
-                      name="duration"
-                      defaultValue={editService?.duration_minutes}
-                      required
-                      min="1"
-                      className="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500"
-                      placeholder="45"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-semibold mb-1">قیمت (تومان)</label>
-                    <input
-                      type="number"
-                      name="price"
-                      defaultValue={editService?.price_toman}
-                      required
-                      min="0"
-                      className="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500"
-                      placeholder="350000"
-                    />
-                  </div>
+                <div>
+                  <Label htmlFor="price">قیمت (تومان)</Label>
+                  <Input
+                    type="number"
+                    id="price"
+                    name="price"
+                    defaultValue={editService?.price_toman}
+                    placeholder="350000"
+                    min="0"
+                    required
+                  />
                 </div>
-                
-                <button
-                  type="submit"
-                  className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-semibold"
-                >
-                  {editService ? 'ذخیره تغییرات' : 'افزودن خدمت'}
-                </button>
               </div>
+              
+              <Button type="submit" className="w-full">
+                {editService ? 'ذخیره تغییرات' : 'افزودن خدمت'}
+              </Button>
             </form>
-          </div>
-        )}
-        
-        {/* Services List */}
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-bold">لیست خدمات</h2>
-            <Link
-              href="/barber/services?add=1"
-              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 font-semibold"
-            >
-              + افزودن خدمت جدید
+          </CardContent>
+        </Card>
+      )}
+      
+      <Card>
+        <CardHeader>
+          <div className="flex justify-between items-center">
+            <CardTitle>لیست خدمات</CardTitle>
+            <Link href="/barber/services?add=1">
+              <Button>
+                <Plus className="w-4 h-4 ml-2" />
+                افزودن خدمت جدید
+              </Button>
             </Link>
           </div>
-          
+        </CardHeader>
+        <CardContent>
           {services.length === 0 ? (
-            <p className="text-gray-600 text-center py-8">هنوز خدمتی اضافه نکرده‌اید</p>
+            <div className="text-center py-12">
+              <Scissors className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+              <p className="text-muted-foreground">هنوز خدمتی اضافه نکرده‌اید</p>
+            </div>
           ) : (
             <div className="space-y-3">
               {services.map((service: any) => (
-                <div key={service.id} className="border rounded-lg p-4 flex justify-between items-start">
+                <div key={service.id} className="border border-border rounded-lg p-4 flex justify-between items-start hover:bg-accent/10 transition-colors">
                   <div className="flex-1">
-                    <h3 className="font-semibold text-lg">{service.name}</h3>
-                    <div className="flex gap-4 text-sm text-gray-600 mt-1">
-                      <span>⏱ {service.duration_minutes} دقیقه</span>
-                      <span>💰 {service.price_toman.toLocaleString('fa-IR')} تومان</span>
+                    <h3 className="font-semibold text-lg text-foreground">{service.name}</h3>
+                    <div className="flex gap-4 text-sm text-muted-foreground mt-2">
+                      <span className="flex items-center gap-1">
+                        <Clock className="w-4 h-4" />
+                        {service.duration_minutes} دقیقه
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <DollarSign className="w-4 h-4" />
+                        {service.price_toman.toLocaleString('fa-IR')} تومان
+                      </span>
                     </div>
                   </div>
                   
                   <div className="flex items-center gap-2">
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${service.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                    <Badge variant={service.is_active ? 'success' : 'outline'}>
                       {service.is_active ? 'فعال' : 'غیرفعال'}
-                    </span>
+                    </Badge>
                     
-                    <Link
-                      href={`/barber/services?edit=${service.id}`}
-                      className="px-3 py-1 text-sm text-blue-600 hover:text-blue-800 font-semibold"
-                    >
-                      ویرایش
+                    <Link href={`/barber/services?edit=${service.id}`}>
+                      <Button variant="ghost" size="sm">
+                        ویرایش
+                      </Button>
                     </Link>
                     
                     <form action={toggleAction} className="inline">
                       <input type="hidden" name="id" value={service.id} />
                       <input type="hidden" name="current_status" value={service.is_active.toString()} />
-                      <button
+                      <Button
                         type="submit"
-                        className="px-3 py-1 text-sm text-red-600 hover:text-red-800 font-semibold"
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive hover:text-destructive"
                       >
-                        {service.is_active ? 'غیرفعال کردن' : 'فعال کردن'}
-                      </button>
+                        {service.is_active ? 'غیرفعال' : 'فعال'}
+                      </Button>
                     </form>
                   </div>
                 </div>
               ))}
             </div>
           )}
-        </div>
-      </div>
-    </div>
+        </CardContent>
+      </Card>
+    </AppShell>
   );
 }

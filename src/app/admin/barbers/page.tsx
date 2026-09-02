@@ -2,6 +2,13 @@ import { requireAdmin } from '@/lib/auth-server';
 import { sql } from '@/db/client';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { AppShell } from '@/components/AppShell';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { Scissors, Plus, X, Check } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,7 +18,6 @@ async function addBarber(formData: FormData) {
   const telegramId = parseInt(formData.get('telegram_id') as string);
   const displayName = formData.get('display_name') as string;
   
-  // Create user
   const [user] = await sql`
     INSERT INTO users (telegram_id, role, name, is_active)
     VALUES (${telegramId}, 'barber', ${displayName}, true)
@@ -19,14 +25,12 @@ async function addBarber(formData: FormData) {
     RETURNING id
   ` as any[];
   
-  // Create barber
   await sql`
     INSERT INTO barbers (user_id, display_name, is_active)
     VALUES (${user.id}, ${displayName}, true)
     ON CONFLICT (user_id) DO UPDATE SET display_name = ${displayName}
   `;
   
-  // Copy default working hours from first barber
   const firstBarber = await sql`
     SELECT id FROM barbers WHERE id != (SELECT id FROM barbers WHERE user_id = ${user.id}) LIMIT 1
   ` as any[];
@@ -73,7 +77,7 @@ export default async function AdminBarbers({
 }: {
   searchParams: { add?: string; added?: string };
 }) {
-  await requireAdmin();
+  const user = await requireAdmin();
   
   const barbers = await sql`
     SELECT b.*, u.name as user_name, u.telegram_id, u.is_active as user_active
@@ -83,114 +87,120 @@ export default async function AdminBarbers({
   ` as any[];
 
   return (
-    <div dir="rtl" className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-gray-800">مدیریت آرایشگران</h1>
-          <Link href="/admin" className="text-blue-600 hover:text-blue-800">بازگشت</Link>
+    <AppShell
+      userName={user.name}
+      userRole="super_admin"
+      pageTitle="مدیریت آرایشگران"
+    >
+      {searchParams.added && (
+        <div className="mb-6 p-4 bg-green-600/10 border border-green-600/20 rounded-lg text-green-600 flex items-center gap-2">
+          <Check className="w-5 h-5" />
+          آرایشگر با موفقیت اضافه شد
         </div>
-      </header>
+      )}
       
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        {searchParams.added && (
-          <div className="mb-4 p-4 bg-green-100 border border-green-300 rounded text-green-800">
-            ✓ آرایشگر با موفقیت اضافه شد
-          </div>
-        )}
-        
-        {/* Add Form */}
-        {searchParams.add && (
-          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold">افزودن آرایشگر جدید</h2>
-              <Link href="/admin/barbers" className="text-gray-600 hover:text-gray-800">✕</Link>
+      {searchParams.add && (
+        <Card className="mb-6">
+          <CardHeader>
+            <div className="flex justify-between items-center">
+              <CardTitle>افزودن آرایشگر جدید</CardTitle>
+              <Link href="/admin/barbers">
+                <Button variant="ghost" size="icon">
+                  <X className="w-5 h-5" />
+                </Button>
+              </Link>
             </div>
-            
+          </CardHeader>
+          <CardContent>
             <form action={addBarber} className="space-y-4">
               <div>
-                <label className="block text-sm font-semibold mb-1">Telegram ID</label>
-                <input
+                <Label htmlFor="telegram_id">Telegram ID</Label>
+                <Input
                   type="number"
+                  id="telegram_id"
                   name="telegram_id"
-                  required
-                  className="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500"
                   placeholder="123456789"
+                  required
                 />
-                <p className="text-xs text-gray-600 mt-1">
+                <p className="text-xs text-muted-foreground mt-1">
                   آیدی عددی تلگرام آرایشگر (با ارسال /start به @userinfobot قابل دریافت است)
                 </p>
               </div>
               
               <div>
-                <label className="block text-sm font-semibold mb-1">نام نمایشی</label>
-                <input
+                <Label htmlFor="display_name">نام نمایشی</Label>
+                <Input
                   type="text"
+                  id="display_name"
                   name="display_name"
-                  required
-                  className="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500"
                   placeholder="نام آرایشگر"
+                  required
                 />
               </div>
               
-              <div className="bg-blue-50 border border-blue-200 rounded p-3 text-sm text-blue-700">
-                <strong>توجه:</strong> ساعات کاری پیش‌فرض از آرایشگر دیگری کپی می‌شود. آرایشگر می‌تواند از پنل خود آن را تغییر دهد.
+              <div className="bg-accent/20 border border-accent/30 rounded-lg p-3 text-sm">
+                <strong>توجه:</strong> ساعات کاری پیش‌فرض از آرایشگر دیگری کپی می‌شود.
               </div>
               
-              <button
-                type="submit"
-                className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-semibold"
-              >
+              <Button type="submit" className="w-full">
                 افزودن آرایشگر
-              </button>
+              </Button>
             </form>
-          </div>
-        )}
-        
-        {/* Barbers List */}
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-bold">لیست آرایشگران ({barbers.length})</h2>
-            <Link
-              href="/admin/barbers?add=1"
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-semibold"
-            >
-              + افزودن آرایشگر
+          </CardContent>
+        </Card>
+      )}
+      
+      <Card>
+        <CardHeader>
+          <div className="flex justify-between items-center">
+            <CardTitle>لیست آرایشگران ({barbers.length})</CardTitle>
+            <Link href="/admin/barbers?add=1">
+              <Button>
+                <Plus className="w-4 h-4 ml-2" />
+                افزودن آرایشگر
+              </Button>
             </Link>
           </div>
-          
+        </CardHeader>
+        <CardContent>
           {barbers.length === 0 ? (
-            <p className="text-gray-600 text-center py-8">آرایشگری یافت نشد</p>
+            <div className="text-center py-12">
+              <Scissors className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+              <p className="text-muted-foreground">آرایشگری یافت نشد</p>
+            </div>
           ) : (
             <div className="space-y-3">
               {barbers.map((barber: any) => (
-                <div key={barber.id} className="border rounded-lg p-4 flex justify-between items-center">
+                <div key={barber.id} className="border border-border rounded-lg p-4 flex justify-between items-center hover:bg-accent/10 transition-colors">
                   <div>
-                    <h3 className="font-semibold text-gray-800">{barber.display_name}</h3>
-                    <p className="text-sm text-gray-600">کاربر: {barber.user_name}</p>
-                    <p className="text-xs text-gray-500 mt-1">Telegram ID: {barber.telegram_id}</p>
+                    <h3 className="font-semibold text-foreground">{barber.display_name}</h3>
+                    <p className="text-sm text-muted-foreground">کاربر: {barber.user_name}</p>
+                    <p className="text-xs text-muted-foreground mt-1">Telegram ID: {barber.telegram_id}</p>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className={`px-3 py-1 rounded-full text-xs ${barber.is_active && barber.user_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                    <Badge variant={barber.is_active && barber.user_active ? 'success' : 'outline'}>
                       {barber.is_active && barber.user_active ? 'فعال' : 'غیرفعال'}
-                    </span>
+                    </Badge>
                     
                     <form action={toggleBarber} className="inline">
                       <input type="hidden" name="barber_id" value={barber.id} />
                       <input type="hidden" name="current_status" value={(barber.is_active && barber.user_active).toString()} />
-                      <button
+                      <Button
                         type="submit"
-                        className="px-3 py-1 text-sm text-red-600 hover:text-red-800 font-semibold"
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive hover:text-destructive"
                       >
-                        {barber.is_active && barber.user_active ? 'غیرفعال کردن' : 'فعال کردن'}
-                      </button>
+                        {barber.is_active && barber.user_active ? 'غیرفعال' : 'فعال'}
+                      </Button>
                     </form>
                   </div>
                 </div>
               ))}
             </div>
           )}
-        </div>
-      </div>
-    </div>
+        </CardContent>
+      </Card>
+    </AppShell>
   );
 }
