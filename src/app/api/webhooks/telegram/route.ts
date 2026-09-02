@@ -972,13 +972,13 @@ export async function POST(request: Request): Promise<Response> {
 
       console.log('[webhook] Message from', userId, 'text:', text);
 
-      if (text === '/start' || text === '/menu') {
+      if (text === '/menu' || text === '/start' || text.startsWith('/start ')) {
         // Check for deep link payload
-        const parts = text.split(' ');
-        if (parts.length > 1 && parts[0] === '/start') {
+        if (text.startsWith('/start ')) {
+          const parts = text.split(' ');
           const payload = parts[1];
-          // Check if it's a barber code
-          if (/^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{6}$/.test(payload)) {
+          // Check if it's a barber code (6-char unambiguous alphabet)
+          if (payload && /^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{6}$/.test(payload)) {
             await startCustomerFlow(chatId, userId, payload);
             return new Response('OK', { status: 200 });
           }

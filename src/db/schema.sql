@@ -70,6 +70,9 @@ ALTER TABLE blocked_slots ADD COLUMN IF NOT EXISTS barber_id INTEGER;
 -- Appointments
 ALTER TABLE appointments ADD COLUMN IF NOT EXISTS barber_id INTEGER;
 
+-- Barbers public_code (for independent-barber platform)
+ALTER TABLE barbers ADD COLUMN IF NOT EXISTS public_code VARCHAR(10);
+
 -- Step 3: Create indexes for new columns (only if columns exist and indexes don't)
 CREATE INDEX IF NOT EXISTS idx_users_telegram_id ON users(telegram_id);
 CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
