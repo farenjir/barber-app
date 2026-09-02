@@ -1,6 +1,7 @@
 import { requireBarber } from '@/lib/auth-server';
 import { sql } from '@/db/client';
 import { getTehranDayStart, getTehranNextDayStart, addTehranDays } from '@/lib/tehran-time';
+import { ensureBarberCode } from '@/lib/auth';
 import { AppShell } from '@/components/MantineAppShell';
 import BarberDashboardClient from './client';
 
@@ -16,6 +17,9 @@ async function getBarberData(userId: number) {
   }
 
   const barberId = barber[0].id;
+  
+  // Ensure barber has a public code
+  const publicCode = await ensureBarberCode(barberId);
   const now = new Date();
   const today = getTehranDayStart(now);
   const tomorrow = getTehranNextDayStart(now);
@@ -66,7 +70,7 @@ async function getBarberData(userId: number) {
   }
 
   return {
-    barber: barber[0],
+    barber: { ...barber[0], public_code: publicCode },
     todayAppointments,
     servicesCount: parseInt(servicesCount[0].count),
     upcomingCount: parseInt(upcomingCount[0].count),
