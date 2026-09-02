@@ -3,33 +3,31 @@ import type { Service } from '@/db/client';
 import { MESSAGES } from '@/lib/messages';
 import { formatFullJalaliDate, formatTime } from '@/lib/jalali';
 import { getNextOpenDays, getAvailableSlots, isSlotAvailable } from '@/lib/slots';
-import { createMagicLink, getUserByTelegramId, getActiveBarbers } from '@/lib/auth';
+import { createMagicLink, getUserByTelegramId, getBarberByUserId, generateBarberCode, getBarberByCode, ensureBarberCode } from '@/lib/auth';
 import { getTehranDayStart, getTehranNextDayStart, addTehranDays } from '@/lib/tehran-time';
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN!;
 const WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET_TOKEN!;
 const TELEGRAM_API = `https://api.telegram.org/bot${BOT_TOKEN}`;
-const SALON_NAME = process.env.SALON_NAME || 'سالن زیبایی';
+const BRAND_NAME = 'نوبت‌آرا';
+const BOT_USERNAME = process.env.BOT_USERNAME || 'BarberAppointmentAppBot';
+const ADMIN_TELEGRAM_IDS = (process.env.ADMIN_TELEGRAM_IDS || '').split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id));
 
 // Get app URL with proper fallbacks
 function getAppUrl(request?: Request): string {
-  // 1. Use APP_URL if set
   if (process.env.APP_URL) {
     return process.env.APP_URL;
   }
   
-  // 2. Use VERCEL_URL if available
   if (process.env.VERCEL_URL) {
     return `https://${process.env.VERCEL_URL}`;
   }
   
-  // 3. Extract from request if provided
   if (request) {
     const url = new URL(request.url);
     return `${url.protocol}//${url.host}`;
   }
   
-  // 4. Fallback
   return 'http://localhost:3000';
 }
 
@@ -68,10 +66,11 @@ interface TelegramChat {
 }
 
 // Booking state type
-interface BookingState {
-  step: 'barber' | 'service' | 'date' | 'time' | 'name' | 'phone' | 'confirm' | 'register_barber_name';
+interface ChatState {
+  step: 'role' | 'enter_code' | 'service' | 'date' | 'time' | 'name' | 'phone' | 'confirm' | 'register_barber_name';
   barberId?: number;
   barberName?: string;
+  barberCode?: string;
   serviceId?: number;
   serviceName?: string;
   duration?: number;
@@ -125,8 +124,8 @@ async function answerCallbackQuery(queryId: string, text?: string): Promise<void
 }
 
 // Helper: Get user state
-async function getUserState(userId: number): Promise<BookingState | null> {
-  const key = `booking_state:${userId}`;
+async function getUserState(userId: number): Promise<ChatState | null> {
+  const key = `chat_state:${userId}`;
   const rows = await sql`
     SELECT value FROM chat_state 
     WHERE key = ${key} 
@@ -138,8 +137,8 @@ async function getUserState(userId: number): Promise<BookingState | null> {
 }
 
 // Helper: Set user state
-async function setUserState(userId: number, state: BookingState): Promise<void> {
-  const key = `booking_state:${userId}`;
+async function setUserState(userId: number, state: ChatState): Promise<void> {
+  const key = `chat_state:${userId}`;
   const value = JSON.stringify(state);
   const expiresAt = new Date(Date.now() + 3600000); // 1 hour
   
@@ -153,35 +152,283 @@ async function setUserState(userId: number, state: BookingState): Promise<void> 
 
 // Helper: Clear user state
 async function clearUserState(userId: number): Promise<void> {
-  const key = `booking_state:${userId}`;
+  const key = `chat_state:${userId}`;
   await sql`DELETE FROM chat_state WHERE key = ${key}`;
 }
 
-// Handle /start and main menu
-async function handleStart(chatId: number, userId: number): Promise<void> {
+// Helper: Check if user is admin
+function isAdmin(userId: number): boolean {
+  return ADMIN_TELEGRAM_IDS.includes(userId);
+}
+
+// Screen 0: Role picker
+async function showRolePicker(chatId: number, userId: number): Promise<void> {
   await clearUserState(userId);
   
-  const welcomeText = MESSAGES.welcome(SALON_NAME);
-  
-  // Check if user is barber or admin
   const user = await getUserByTelegramId(userId);
-  const isStaff = user && (user.role === 'barber' || user.role === 'super_admin');
+  const isBarber = user && user.role === 'barber';
+  const isSuperAdmin = user && user.role === 'super_admin';
+  const showAdmin = isAdmin(userId);
   
+  // Build inline keyboard
+  const buttons: any[][] = [
+    [{ text: MESSAGES.roleCustomer, callback_data: 'role_customer' }],
+    [{ text: MESSAGES.roleBarber, callback_data: 'role_barber' }],
+  ];
+  
+  if (showAdmin) {
+    buttons.push([{ text: MESSAGES.roleAdmin, callback_data: 'role_admin' }]);
+  }
+  
+  const keyboard = { inline_keyboard: buttons };
+  await sendMessage(chatId, MESSAGES.rolePicker, keyboard);
+}
+
+// Customer flow: request barber code
+async function startCustomerFlow(chatId: number, userId: number, barberCode?: string): Promise<void> {
+  if (barberCode) {
+    // Deep link with code
+    await handleBarberCodeInput(chatId, userId, barberCode);
+  } else {
+    // Check if user has a previous barber
+    const lastBooking = await sql`
+      SELECT b.id, b.display_name, b.public_code
+      FROM appointments a
+      JOIN barbers b ON a.barber_id = b.id
+      WHERE a.customer_telegram_id = ${userId}
+      ORDER BY a.created_at DESC
+      LIMIT 1
+    ` as any[];
+    
+    if (lastBooking.length > 0 && lastBooking[0].public_code) {
+      const barber = lastBooking[0];
+      const keyboard = {
+        inline_keyboard: [
+          [{ text: MESSAGES.customer.continueWithBarber(barber.display_name), callback_data: `use_barber_${barber.id}` }],
+          [{ text: MESSAGES.customer.enterDifferentCode, callback_data: 'enter_code' }],
+          [{ text: MESSAGES.customer.menuMain, callback_data: 'menu' }],
+        ],
+      };
+      await sendMessage(chatId, MESSAGES.customer.requestBarberCode, keyboard);
+    } else {
+      await setUserState(userId, { step: 'enter_code' });
+      const keyboard = {
+        inline_keyboard: [
+          [{ text: MESSAGES.customer.menuMain, callback_data: 'menu' }],
+        ],
+      };
+      await sendMessage(chatId, MESSAGES.customer.requestBarberCode, keyboard);
+    }
+  }
+}
+
+// Handle barber code input
+async function handleBarberCodeInput(chatId: number, userId: number, code: string): Promise<void> {
+  const barber = await getBarberByCode(code);
+  
+  if (!barber) {
+    await sendMessage(chatId, MESSAGES.customer.barberNotFound);
+    await startCustomerFlow(chatId, userId);
+    return;
+  }
+  
+  // Check if barber has active services
+  const services = await sql`
+    SELECT id FROM services 
+    WHERE barber_id = ${barber.id} AND is_active = true
+    LIMIT 1
+  ` as any[];
+  
+  if (services.length === 0) {
+    await sendMessage(chatId, MESSAGES.customer.barberNoServices);
+    await startCustomerFlow(chatId, userId);
+    return;
+  }
+  
+  // Show services
+  await setUserState(userId, { 
+    step: 'service', 
+    barberId: barber.id,
+    barberName: barber.display_name,
+    barberCode: code,
+  });
+  await handleServiceSelection(chatId, userId, barber.id);
+}
+
+// Customer menu
+async function showCustomerMenu(chatId: number, userId: number): Promise<void> {
   const keyboard = {
     keyboard: [
-      [{ text: '📅 رزرو نوبت جدید' }],
-      [{ text: '📋 نوبت‌های من' }, { text: '❌ لغو نوبت' }],
-      [{ text: '💇 خدمات و قیمت‌ها' }, { text: '❓ راهنما' }],
-      ...(isStaff ? [[{ text: '🔐 ورود به پنل مدیریت' }]] : [[{ text: '✍️ ثبت‌نام آرایشگر' }]]),
+      [{ text: MESSAGES.customer.menuNewBooking }],
+      [{ text: MESSAGES.customer.menuMyBookings }, { text: MESSAGES.customer.menuCancel }],
+      [{ text: MESSAGES.customer.menuChangeBarber }, { text: MESSAGES.customer.menuHelp }],
+      [{ text: MESSAGES.customer.menuMain }],
     ],
     resize_keyboard: true,
     one_time_keyboard: false,
   };
-
-  await sendMessage(chatId, welcomeText, keyboard);
+  await sendMessage(chatId, MESSAGES.customer.menu, keyboard);
 }
 
-// Handle /panel command
+// Barber flow: signup or menu
+async function startBarberFlow(chatId: number, userId: number, request?: Request): Promise<void> {
+  const user = await getUserByTelegramId(userId);
+  
+  if (!user || (user.role !== 'barber' && user.role !== 'super_admin')) {
+    // Signup
+    await setUserState(userId, { step: 'register_barber_name' });
+    await sendMessage(chatId, MESSAGES.barber.signup.welcome);
+    return;
+  }
+  
+  // Show barber menu
+  await showBarberMenu(chatId, userId);
+}
+
+// Barber signup
+async function completeBarberSignup(chatId: number, userId: number, displayName: string, request?: Request): Promise<void> {
+  try {
+    const existingUser = await getUserByTelegramId(userId);
+    
+    let userDbId: number;
+    
+    if (existingUser) {
+      await sql`
+        UPDATE users
+        SET role = 'barber', name = ${displayName}
+        WHERE telegram_id = ${userId}
+      `;
+      userDbId = existingUser.id;
+    } else {
+      const [newUser] = await sql`
+        INSERT INTO users (telegram_id, role, name, is_active)
+        VALUES (${userId}, 'barber', ${displayName}, true)
+        RETURNING id
+      ` as any[];
+      userDbId = newUser.id;
+    }
+    
+    // Generate barber code
+    const publicCode = await generateBarberCode();
+    
+    // Create barber record
+    const [barber] = await sql`
+      INSERT INTO barbers (user_id, display_name, public_code, is_active)
+      VALUES (${userDbId}, ${displayName}, ${publicCode}, true)
+      RETURNING id
+    ` as any[];
+    
+    const barberId = barber.id;
+    
+    // Seed working hours (10:00-21:00, all days)
+    const workingHours = [
+      { weekday: 0, start_time: '10:00', end_time: '21:00', is_open: true },
+      { weekday: 1, start_time: '10:00', end_time: '21:00', is_open: true },
+      { weekday: 2, start_time: '10:00', end_time: '21:00', is_open: true },
+      { weekday: 3, start_time: '10:00', end_time: '21:00', is_open: true },
+      { weekday: 4, start_time: '10:00', end_time: '21:00', is_open: true },
+      { weekday: 5, start_time: '10:00', end_time: '21:00', is_open: true },
+      { weekday: 6, start_time: '10:00', end_time: '21:00', is_open: true },
+    ];
+    
+    for (const hours of workingHours) {
+      await sql`
+        INSERT INTO working_hours (barber_id, weekday, start_time, end_time, is_open)
+        VALUES (${barberId}, ${hours.weekday}, ${hours.start_time}, ${hours.end_time}, ${hours.is_open})
+      `;
+    }
+    
+    await clearUserState(userId);
+    
+    // Generate magic link
+    const appUrl = getAppUrl(request);
+    const token = await createMagicLink(userDbId);
+    const magicLink = `${appUrl}/api/auth/magic?token=${token}`;
+    const inviteLink = `https://t.me/${BOT_USERNAME}?start=${publicCode}`;
+    
+    await sendMessage(
+      chatId, 
+      MESSAGES.barber.signup.success(publicCode, inviteLink, magicLink),
+      undefined,
+      true
+    );
+    
+    await showBarberMenu(chatId, userId);
+  } catch (error) {
+    console.error('Error in barber signup:', error);
+    await sendMessage(chatId, MESSAGES.barber.signup.error);
+  }
+}
+
+// Barber menu
+async function showBarberMenu(chatId: number, userId: number): Promise<void> {
+  const keyboard = {
+    keyboard: [
+      [{ text: MESSAGES.barber.menuToday }],
+      [{ text: MESSAGES.barber.menuPanel }, { text: MESSAGES.barber.menuMyCode }],
+      [{ text: MESSAGES.barber.menuHelp }],
+      [{ text: MESSAGES.barber.menuMain }],
+    ],
+    resize_keyboard: true,
+    one_time_keyboard: false,
+  };
+  await sendMessage(chatId, MESSAGES.barber.menu, keyboard);
+}
+
+// Show barber code
+async function showBarberCode(chatId: number, userId: number): Promise<void> {
+  const user = await getUserByTelegramId(userId);
+  if (!user) return;
+  
+  const barber = await getBarberByUserId(user.id);
+  if (!barber) {
+    await sendMessage(chatId, 'شما به عنوان آرایشگر ثبت نشده‌اید.');
+    return;
+  }
+  
+  const code = await ensureBarberCode(barber.id);
+  const inviteLink = `https://t.me/${BOT_USERNAME}?start=${code}`;
+  
+  await sendMessage(chatId, MESSAGES.barber.codeInfo(code, inviteLink), undefined, true);
+}
+
+// Admin flow
+async function startAdminFlow(chatId: number, userId: number, request?: Request): Promise<void> {
+  if (!isAdmin(userId)) {
+    await sendMessage(chatId, 'شما دسترسی به پنل ادمین ندارید.');
+    return;
+  }
+  
+  const user = await getUserByTelegramId(userId);
+  if (!user) {
+    await sendMessage(chatId, 'کاربر یافت نشد.');
+    return;
+  }
+  
+  const appUrl = getAppUrl(request);
+  
+  if (!appUrl || appUrl === 'http://localhost:3000') {
+    await sendMessage(chatId, 'پنل مدیریت در دسترس نیست.');
+    return;
+  }
+  
+  try {
+    const token = await createMagicLink(user.id);
+    const magicLink = `${appUrl}/api/auth/magic?token=${token}`;
+    
+    await sendMessage(
+      chatId,
+      `${MESSAGES.admin.welcome}\n\n${magicLink}\n\n⏰ لینک تا ۱۰ دقیقه معتبر است.`,
+      undefined,
+      true
+    );
+  } catch (error) {
+    console.error('Error creating admin magic link:', error);
+    await sendMessage(chatId, 'خطا در ایجاد لینک ورود.');
+  }
+}
+
+// Handle panel command
 async function handlePanelCommand(chatId: number, userId: number, request?: Request): Promise<void> {
   const user = await getUserByTelegramId(userId);
   
@@ -193,7 +440,7 @@ async function handlePanelCommand(chatId: number, userId: number, request?: Requ
   const appUrl = getAppUrl(request);
   
   if (!appUrl || appUrl === 'http://localhost:3000') {
-    await sendMessage(chatId, 'پنل مدیریت در حال حاضر در دسترس نیست. لطفاً با پشتیبانی تماس بگیرید.');
+    await sendMessage(chatId, 'پنل مدیریت در دسترس نیست.');
     return;
   }
 
@@ -203,131 +450,14 @@ async function handlePanelCommand(chatId: number, userId: number, request?: Requ
     
     await sendMessage(
       chatId,
-      `🔐 لینک ورود به پنل مدیریت:\n\n${magicLink}\n\n⏰ این لینک تا ۱۰ دقیقه دیگر معتبر است و فقط یک بار قابل استفاده می‌باشد.`,
+      `🔐 لینک ورود به پنل مدیریت:\n\n${magicLink}\n\n⏰ لینک تا ۱۰ دقیقه معتبر است.`,
       undefined,
       true
     );
   } catch (error) {
     console.error('Error creating magic link:', error);
-    await sendMessage(chatId, 'خطا در ایجاد لینک ورود. لطفاً دوباره تلاش کنید.');
+    await sendMessage(chatId, 'خطا در ایجاد لینک ورود.');
   }
-}
-
-// Handle barber registration
-async function handleBarberRegistration(chatId: number, userId: number, request?: Request): Promise<void> {
-  // Check if user already has barber or admin role
-  const user = await getUserByTelegramId(userId);
-  
-  if (user && (user.role === 'barber' || user.role === 'super_admin')) {
-    await sendMessage(chatId, MESSAGES.barberRegistration.alreadyBarber);
-    return;
-  }
-  
-  // Ask for display name
-  await setUserState(userId, { step: 'register_barber_name' });
-  await sendMessage(chatId, MESSAGES.barberRegistration.requestDisplayName);
-}
-
-// Complete barber registration
-async function completeBarberRegistration(chatId: number, userId: number, displayName: string, request?: Request): Promise<void> {
-  try {
-    // Check if user exists
-    const existingUser = await getUserByTelegramId(userId);
-    
-    let userDbId: number;
-    
-    if (existingUser) {
-      // Update existing customer to barber
-      await sql`
-        UPDATE users
-        SET role = 'barber', name = ${displayName}
-        WHERE telegram_id = ${userId}
-      `;
-      userDbId = existingUser.id;
-    } else {
-      // Create new user with barber role
-      const [newUser] = await sql`
-        INSERT INTO users (telegram_id, role, name, is_active)
-        VALUES (${userId}, 'barber', ${displayName}, true)
-        RETURNING id
-      ` as any[];
-      userDbId = newUser.id;
-    }
-    
-    // Create barber record
-    const [barber] = await sql`
-      INSERT INTO barbers (user_id, display_name, is_active)
-      VALUES (${userDbId}, ${displayName}, true)
-      RETURNING id
-    ` as any[];
-    
-    const barberId = barber.id;
-    
-    // Seed working hours for all 7 weekdays (10:00-21:00, all open)
-    const workingHours = [
-      { weekday: 0, start_time: '10:00', end_time: '21:00', is_open: true },  // Sunday
-      { weekday: 1, start_time: '10:00', end_time: '21:00', is_open: true },  // Monday
-      { weekday: 2, start_time: '10:00', end_time: '21:00', is_open: true },  // Tuesday
-      { weekday: 3, start_time: '10:00', end_time: '21:00', is_open: true },  // Wednesday
-      { weekday: 4, start_time: '10:00', end_time: '21:00', is_open: true },  // Thursday
-      { weekday: 5, start_time: '10:00', end_time: '21:00', is_open: true },  // Friday
-      { weekday: 6, start_time: '10:00', end_time: '21:00', is_open: true },  // Saturday
-    ];
-    
-    for (const hours of workingHours) {
-      await sql`
-        INSERT INTO working_hours (barber_id, weekday, start_time, end_time, is_open)
-        VALUES (${barberId}, ${hours.weekday}, ${hours.start_time}, ${hours.end_time}, ${hours.is_open})
-      `;
-    }
-    
-    // Clear registration state
-    await clearUserState(userId);
-    
-    // Send magic link to panel
-    const appUrl = getAppUrl(request);
-    const token = await createMagicLink(userDbId);
-    const magicLink = `${appUrl}/api/auth/magic?token=${token}`;
-    
-    await sendMessage(chatId, MESSAGES.barberRegistration.success(magicLink), undefined, true);
-  } catch (error) {
-    console.error('Error in barber registration:', error);
-    await sendMessage(chatId, MESSAGES.barberRegistration.error);
-  }
-}
-
-// Handle barber selection (for multi-barber booking)
-async function handleBarberSelection(chatId: number, userId: number): Promise<void> {
-  const barbers = await getActiveBarbers();
-
-  if (barbers.length === 0) {
-    await sendMessage(chatId, 'متأسفانه در حال حاضر هیچ آرایشگری در دسترس نیست.');
-    return;
-  }
-
-  // If only one barber, skip selection
-  if (barbers.length === 1) {
-    const state: BookingState = {
-      step: 'service',
-      barberId: barbers[0].id,
-      barberName: barbers[0].display_name,
-    };
-    await setUserState(userId, state);
-    await handleServiceSelection(chatId, userId, barbers[0].id);
-    return;
-  }
-
-  // Multiple barbers - show selection
-  await setUserState(userId, { step: 'barber' });
-
-  const buttons = barbers.map((b) => [{
-    text: b.display_name,
-    callback_data: `bb_${b.id}`,
-  }]);
-  buttons.push([{ text: '🏠 بازگشت به منو', callback_data: 'menu' }]);
-
-  const keyboard = { inline_keyboard: buttons };
-  await sendMessage(chatId, 'لطفاً آرایشگر مورد نظر خود را انتخاب کنید:', keyboard);
 }
 
 // Handle service selection
@@ -339,7 +469,7 @@ async function handleServiceSelection(chatId: number, userId: number, barberId: 
   ` as unknown as Service[];
 
   if (services.length === 0) {
-    await sendMessage(chatId, 'متأسفانه در حال حاضر خدمتی موجود نیست.');
+    await sendMessage(chatId, 'متأسفانه خدمتی موجود نیست.');
     return;
   }
 
@@ -347,7 +477,7 @@ async function handleServiceSelection(chatId: number, userId: number, barberId: 
     text: `${s.name} (${s.duration_minutes}د - ${s.price_toman.toLocaleString('fa-IR')}ت)`,
     callback_data: `sv_${s.id}`,
   }]);
-  buttons.push([{ text: '🏠 بازگشت به منو', callback_data: 'menu' }]);
+  buttons.push([{ text: '🏠 بازگشت', callback_data: 'back' }]);
 
   const keyboard = { inline_keyboard: buttons };
   await sendMessage(chatId, MESSAGES.selectService, keyboard);
@@ -387,7 +517,7 @@ async function handleServiceSelected(
     text: formatFullJalaliDate(date),
     callback_data: `dt_${date.toISOString()}`,
   }]);
-  buttons.push([{ text: '🏠 بازگشت به منو', callback_data: 'menu' }]);
+  buttons.push([{ text: '🏠 بازگشت', callback_data: 'back' }]);
 
   const keyboard = { inline_keyboard: buttons };
   await sendMessage(chatId, MESSAGES.selectDate, keyboard);
@@ -401,7 +531,7 @@ async function handleDateSelected(
 ): Promise<void> {
   const state = await getUserState(userId);
   if (!state || !state.duration || !state.barberId) {
-    await handleStart(chatId, userId);
+    await showRolePicker(chatId, userId);
     return;
   }
 
@@ -421,7 +551,7 @@ async function handleDateSelected(
     text: formatTime(slot),
     callback_data: `tm_${slot.toISOString()}`,
   }]);
-  buttons.push([{ text: '🏠 بازگشت به منو', callback_data: 'menu' }]);
+  buttons.push([{ text: '🏠 بازگشت', callback_data: 'back' }]);
 
   const keyboard = { inline_keyboard: buttons };
   await sendMessage(chatId, MESSAGES.selectTime(formatFullJalaliDate(date)), keyboard);
@@ -435,7 +565,7 @@ async function handleTimeSelected(
 ): Promise<void> {
   const state = await getUserState(userId);
   if (!state) {
-    await handleStart(chatId, userId);
+    await showRolePicker(chatId, userId);
     return;
   }
 
@@ -446,62 +576,72 @@ async function handleTimeSelected(
   await sendMessage(chatId, MESSAGES.requestName);
 }
 
-// Handle text input (name/phone)
+// Handle text input
 async function handleText(chatId: number, userId: number, text: string, request?: Request): Promise<void> {
   const state = await getUserState(userId);
 
-  // Check for menu buttons
-  if (text === '📅 رزرو نوبت جدید') {
-    await handleBarberSelection(chatId, userId);
+  // Check for menu buttons - Customer
+  if (text === MESSAGES.customer.menuNewBooking) {
+    await startCustomerFlow(chatId, userId);
     return;
   }
-  if (text === '📋 نوبت‌های من') {
+  if (text === MESSAGES.customer.menuMyBookings) {
     await handleMyBookings(chatId, userId);
     return;
   }
-  if (text === '❌ لغو نوبت') {
+  if (text === MESSAGES.customer.menuCancel) {
     await handleCancelBooking(chatId, userId);
     return;
   }
-  if (text === '💇 خدمات و قیمت‌ها') {
-    await handleServices(chatId);
+  if (text === MESSAGES.customer.menuHelp) {
+    await sendMessage(chatId, MESSAGES.customer.help);
     return;
   }
-  if (text === '❓ راهنما') {
-    await sendMessage(chatId, MESSAGES.help);
+  if (text === MESSAGES.customer.menuChangeBarber) {
+    await startCustomerFlow(chatId, userId);
     return;
   }
-  if (text === '🔐 ورود به پنل مدیریت' || text === '/panel') {
+  if (text === MESSAGES.customer.menuMain || text === MESSAGES.barber.menuMain) {
+    await showRolePicker(chatId, userId);
+    return;
+  }
+  
+  // Check for menu buttons - Barber
+  if (text === MESSAGES.barber.menuToday) {
+    const user = await getUserByTelegramId(userId);
+    if (user) {
+      await handleTodayCommand(chatId, userId, user);
+    }
+    return;
+  }
+  if (text === MESSAGES.barber.menuPanel) {
     await handlePanelCommand(chatId, userId, request);
     return;
   }
-  if (text === '✍️ ثبت‌نام آرایشگر' || text === '/register_barber') {
-    await handleBarberRegistration(chatId, userId, request);
+  if (text === MESSAGES.barber.menuMyCode) {
+    await showBarberCode(chatId, userId);
     return;
   }
-
-  // Check for barber/admin commands
-  const user = await getUserByTelegramId(userId);
-  if (user && (user.role === 'barber' || user.role === 'super_admin')) {
-    if (text === '/today') {
-      await handleTodayCommand(chatId, userId, user);
-      return;
-    }
-    if (text === '/week') {
-      await handleWeekCommand(chatId, userId, user);
-      return;
-    }
+  if (text === MESSAGES.barber.menuHelp) {
+    await sendMessage(chatId, MESSAGES.barber.help);
+    return;
   }
 
   // State machine text input
   if (!state) {
-    await handleStart(chatId, userId);
+    await showRolePicker(chatId, userId);
     return;
   }
 
   if (state.step === 'register_barber_name') {
     const displayName = text.trim();
-    await completeBarberRegistration(chatId, userId, displayName, request);
+    await completeBarberSignup(chatId, userId, displayName, request);
+    return;
+  }
+
+  if (state.step === 'enter_code') {
+    const code = text.trim().toUpperCase();
+    await handleBarberCodeInput(chatId, userId, code);
     return;
   }
 
@@ -526,14 +666,14 @@ async function handleText(chatId: number, userId: number, text: string, request?
   }
 
   // Unknown text
-  await handleStart(chatId, userId);
+  await showRolePicker(chatId, userId);
 }
 
 // Show booking summary
 async function showBookingSummary(
   chatId: number,
   userId: number,
-  state: BookingState
+  state: ChatState
 ): Promise<void> {
   if (!state.serviceName || !state.time || !state.name || !state.phone || state.price === undefined) {
     await sendMessage(chatId, MESSAGES.error);
@@ -576,7 +716,7 @@ async function handleBookingConfirm(chatId: number, userId: number): Promise<voi
 
   // Check availability
   if (!(await isSlotAvailable(state.barberId, appointmentTime, state.duration))) {
-    await sendMessage(chatId, 'متأسفانه این زمان دیگر در دسترس نیست. لطفاً دوباره تلاش کنید.');
+    await sendMessage(chatId, 'متأسفانه این زمان دیگر در دسترس نیست.');
     await clearUserState(userId);
     return;
   }
@@ -601,17 +741,19 @@ async function handleBookingConfirm(chatId: number, userId: number): Promise<voi
 
   // Notify the barber
   await notifyBarber(appointmentId, state, userId);
+  
+  // Show customer menu
+  await showCustomerMenu(chatId, userId);
 }
 
 // Notify barber of new booking
 async function notifyBarber(
   appointmentId: number,
-  state: BookingState,
+  state: ChatState,
   customerId: number
 ): Promise<void> {
   if (!state.barberId) return;
 
-  // Get barber's telegram ID
   const barberUser = await sql`
     SELECT u.telegram_id
     FROM barbers b
@@ -643,7 +785,7 @@ async function notifyBarber(
   }
 }
 
-// Handle barber/admin confirm
+// Handle barber confirm
 async function handleAdminConfirm(chatId: number, appointmentId: number): Promise<void> {
   await sql`
     UPDATE appointments
@@ -658,11 +800,11 @@ async function handleAdminConfirm(chatId: number, appointmentId: number): Promis
   if (appointment.length > 0) {
     const appt = appointment[0];
     await sendMessage(appt.customer_telegram_id, MESSAGES.bookingConfirmed);
-    await sendMessage(chatId, '✅ نوبت تأیید شد و به مشتری اطلاع داده شد.');
+    await sendMessage(chatId, '✅ نوبت تأیید شد.');
   }
 }
 
-// Handle barber/admin reject
+// Handle barber reject
 async function handleAdminReject(chatId: number, appointmentId: number): Promise<void> {
   await sql`
     UPDATE appointments
@@ -677,7 +819,7 @@ async function handleAdminReject(chatId: number, appointmentId: number): Promise
   if (appointment.length > 0) {
     const appt = appointment[0];
     await sendMessage(appt.customer_telegram_id, MESSAGES.bookingRejected);
-    await sendMessage(chatId, '❌ نوبت رد شد و به مشتری اطلاع داده شد.');
+    await sendMessage(chatId, '❌ نوبت رد شد.');
   }
 }
 
@@ -735,45 +877,13 @@ async function handleCancelBooking(chatId: number, userId: number): Promise<void
     const dateTimeStr = `${formatFullJalaliDate(dateTime).substring(0, 15)} ${formatTime(dateTime)}`;
     return [{ text: `${appt.service_name} - ${dateTimeStr}`, callback_data: `ca_${appt.id}` }];
   });
-  buttons.push([{ text: '🏠 بازگشت به منو', callback_data: 'menu' }]);
+  buttons.push([{ text: '🏠 بازگشت', callback_data: 'menu' }]);
 
   const keyboard = { inline_keyboard: buttons };
   await sendMessage(chatId, MESSAGES.selectBookingToCancel, keyboard);
 }
 
-// Handle services list
-async function handleServices(chatId: number): Promise<void> {
-  const services = await sql`
-    SELECT s.*, b.display_name as barber_name
-    FROM services s
-    JOIN barbers b ON s.barber_id = b.id
-    WHERE s.is_active = true AND b.is_active = true
-    ORDER BY b.display_name, s.name
-  ` as unknown as any[];
-
-  let message = MESSAGES.servicesList;
-  
-  // Group by barber
-  const barbers = new Map<string, any[]>();
-  for (const service of services) {
-    const barberName = service.barber_name;
-    if (!barbers.has(barberName)) {
-      barbers.set(barberName, []);
-    }
-    barbers.get(barberName)!.push(service);
-  }
-
-  for (const [barberName, barberServices] of barbers) {
-    message += `\n\n👤 ${barberName}:`;
-    for (const service of barberServices) {
-      message += `\n• ${service.name}\n⏱ ${service.duration_minutes} دقیقه\n💰 ${service.price_toman.toLocaleString('fa-IR')} تومان`;
-    }
-  }
-
-  await sendMessage(chatId, message);
-}
-
-// Barber/Admin: today's appointments
+// Barber: today's appointments
 async function handleTodayCommand(chatId: number, userId: number, user: any): Promise<void> {
   const now = new Date();
   const today = getTehranDayStart(now);
@@ -781,7 +891,6 @@ async function handleTodayCommand(chatId: number, userId: number, user: any): Pr
 
   let query;
   if (user.role === 'barber') {
-    // Get barber's appointments only
     const barber = await sql`
       SELECT id FROM barbers WHERE user_id = ${user.id}
     ` as any[];
@@ -803,7 +912,6 @@ async function handleTodayCommand(chatId: number, userId: number, user: any): Pr
       ORDER BY a.appointment_time ASC
     `;
   } else {
-    // Super admin: all appointments
     query = sql`
       SELECT a.*, s.name as service_name, b.display_name as barber_name
       FROM appointments a
@@ -834,68 +942,7 @@ async function handleTodayCommand(chatId: number, userId: number, user: any): Pr
   await sendMessage(chatId, message);
 }
 
-// Barber/Admin: week's appointments
-async function handleWeekCommand(chatId: number, userId: number, user: any): Promise<void> {
-  const now = new Date();
-  const today = getTehranDayStart(now);
-  const nextWeek = addTehranDays(today, 7);
-
-  let query;
-  if (user.role === 'barber') {
-    // Get barber's appointments only
-    const barber = await sql`
-      SELECT id FROM barbers WHERE user_id = ${user.id}
-    ` as any[];
-    
-    if (barber.length === 0) {
-      await sendMessage(chatId, 'شما به عنوان آرایشگر ثبت نشده‌اید.');
-      return;
-    }
-
-    const barberId = barber[0].id;
-    query = sql`
-      SELECT a.*, s.name as service_name
-      FROM appointments a
-      JOIN services s ON a.service_id = s.id
-      WHERE a.barber_id = ${barberId}
-      AND a.appointment_time >= ${today.toISOString()}
-      AND a.appointment_time < ${nextWeek.toISOString()}
-      AND a.status IN ('pending', 'confirmed')
-      ORDER BY a.appointment_time ASC
-    `;
-  } else {
-    // Super admin: all appointments
-    query = sql`
-      SELECT a.*, s.name as service_name, b.display_name as barber_name
-      FROM appointments a
-      JOIN services s ON a.service_id = s.id
-      JOIN barbers b ON a.barber_id = b.id
-      WHERE a.appointment_time >= ${today.toISOString()}
-      AND a.appointment_time < ${nextWeek.toISOString()}
-      AND a.status IN ('pending', 'confirmed')
-      ORDER BY b.display_name, a.appointment_time ASC
-    `;
-  }
-
-  const appointments = await query as unknown as Array<any>;
-
-  if (appointments.length === 0) {
-    await sendMessage(chatId, 'هفته آینده نوبتی وجود ندارد.');
-    return;
-  }
-
-  let message = '📋 *نوبت‌های هفته آینده:*\n';
-  for (const appt of appointments) {
-    const dateTime = new Date(appt.appointment_time);
-    const status = appt.status === 'confirmed' ? '✅' : '⏳';
-    const barberInfo = user.role === 'super_admin' ? ` (${appt.barber_name})` : '';
-    message += `\n• ${formatFullJalaliDate(dateTime).substring(0, 15)} ${formatTime(dateTime)}\n  ${appt.service_name}${barberInfo} - ${appt.customer_name} ${status}`;
-  }
-
-  await sendMessage(chatId, message);
-}
-
-// Phone validation
+// Phone validation (Iranian mobile)
 function isValidPhone(phone: string): boolean {
   return /^09\d{9}$/.test(phone.replace(/[\s-]/g, ''));
 }
@@ -925,8 +972,18 @@ export async function POST(request: Request): Promise<Response> {
 
       console.log('[webhook] Message from', userId, 'text:', text);
 
-      if (text === '/start' || text === '/menu') {
-        await handleStart(chatId, userId);
+      if (text === '/menu' || text === '/start' || text.startsWith('/start ')) {
+        // Check for deep link payload
+        if (text.startsWith('/start ')) {
+          const parts = text.split(' ');
+          const payload = parts[1];
+          // Check if it's a barber code (6-char unambiguous alphabet)
+          if (payload && /^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{6}$/.test(payload)) {
+            await startCustomerFlow(chatId, userId, payload);
+            return new Response('OK', { status: 200 });
+          }
+        }
+        await showRolePicker(chatId, userId);
       } else {
         await handleText(chatId, userId, text, request);
       }
@@ -949,20 +1006,38 @@ export async function POST(request: Request): Promise<Response> {
 
       if (data === 'menu') {
         await clearUserState(userId);
-        await handleStart(chatId, userId);
-      } else if (data === 'new') {
-        await handleBarberSelection(chatId, userId);
+        await showRolePicker(chatId, userId);
+      } else if (data === 'back') {
+        const state = await getUserState(userId);
+        if (state && state.step === 'date' && state.barberId) {
+          await handleServiceSelection(chatId, userId, state.barberId);
+        } else {
+          await showRolePicker(chatId, userId);
+        }
+      } else if (data === 'role_customer') {
+        await startCustomerFlow(chatId, userId);
+      } else if (data === 'role_barber') {
+        await startBarberFlow(chatId, userId, request);
+      } else if (data === 'role_admin') {
+        await startAdminFlow(chatId, userId, request);
+      } else if (data === 'enter_code') {
+        await setUserState(userId, { step: 'enter_code' });
+        await sendMessage(chatId, MESSAGES.customer.requestBarberCode);
+      } else if (data.startsWith('use_barber_')) {
+        const barberId = parseInt(data.replace('use_barber_', ''));
+        const barber = await sql`
+          SELECT * FROM barbers WHERE id = ${barberId} AND is_active = true
+        ` as any[];
+        if (barber.length > 0) {
+          await setUserState(userId, { 
+            step: 'service', 
+            barberId: barber[0].id,
+            barberName: barber[0].display_name,
+          });
+          await handleServiceSelection(chatId, userId, barber[0].id);
+        }
       } else if (data === 'confirm') {
         await handleBookingConfirm(chatId, userId);
-      } else if (data.startsWith('bb_')) {
-        const barberId = parseInt(data.replace('bb_', ''));
-        const state = await getUserState(userId);
-        if (state) {
-          state.step = 'service';
-          state.barberId = barberId;
-          await setUserState(userId, state);
-        }
-        await handleServiceSelection(chatId, userId, barberId);
       } else if (data.startsWith('sv_')) {
         const serviceId = parseInt(data.replace('sv_', ''));
         await handleServiceSelected(chatId, userId, serviceId);
@@ -980,18 +1055,16 @@ export async function POST(request: Request): Promise<Response> {
         await handleAdminReject(chatId, appointmentId);
       } else if (data.startsWith('ca_')) {
         const appointmentId = parseInt(data.replace('ca_', ''));
-        // Confirm cancel
         const keyboard = {
           inline_keyboard: [
             [{ text: '✅ تأیید لغو', callback_data: `cc_${appointmentId}` }],
             [{ text: '❌ بازگشت', callback_data: 'menu' }],
           ],
         };
-        await sendMessage(chatId, 'آیا مطمئن هستید که می‌خواهید این نوبت را لغو کنید؟', keyboard);
+        await sendMessage(chatId, 'آیا مطمئن هستید؟', keyboard);
       } else if (data.startsWith('cc_')) {
         const appointmentId = parseInt(data.replace('cc_', ''));
         
-        // Get appointment details for notification
         const appt = await sql`
           SELECT a.*, b.user_id as barber_user_id
           FROM appointments a
@@ -1007,7 +1080,6 @@ export async function POST(request: Request): Promise<Response> {
           `;
           await sendMessage(chatId, MESSAGES.bookingCancelled);
           
-          // Notify barber
           const barberUser = await sql`
             SELECT telegram_id FROM users WHERE id = ${appt[0].barber_user_id}
           ` as any[];
@@ -1023,7 +1095,7 @@ export async function POST(request: Request): Promise<Response> {
       }
     }
 
-    console.log('[webhook] Processing complete, returning 200');
+    console.log('[webhook] Processing complete');
     return new Response('OK', { status: 200 });
   } catch (error) {
     console.error('[webhook] Error:', error);

@@ -1,8 +1,8 @@
 'use client';
 
-import { Paper, SimpleGrid, Text, Badge, Stack, Group } from '@mantine/core';
+import { Paper, SimpleGrid, Text, Badge, Stack, Group, CopyButton, ActionIcon, Tooltip } from '@mantine/core';
 import { BarChart } from '@mantine/charts';
-import { IconCalendar, IconScissors, IconClock } from '@tabler/icons-react';
+import { IconCalendar, IconScissors, IconClock, IconCopy, IconCheck, IconKey } from '@tabler/icons-react';
 import Link from 'next/link';
 
 interface BarberDashboardData {
@@ -14,8 +14,49 @@ interface BarberDashboardData {
 }
 
 export default function BarberDashboardClient({ data }: { data: BarberDashboardData }) {
+  const botUsername = process.env.NEXT_PUBLIC_BOT_USERNAME || 'BarberAppointmentAppBot';
+  const inviteLink = `https://t.me/${botUsername}?start=${data.barber.public_code}`;
+  
   return (
     <Stack>
+      {/* Barber Code Card */}
+      {data.barber.public_code && (
+        <Paper p="md" withBorder bg="orange.9">
+          <Group justify="space-between" wrap="wrap">
+            <Group>
+              <IconKey size={32} />
+              <div>
+                <Text size="xs" c="dimmed">کد آرایشگر شما</Text>
+                <Text size="xl" fw={700} tt="uppercase">{data.barber.public_code}</Text>
+              </div>
+            </Group>
+            <Group>
+              <CopyButton value={data.barber.public_code}>
+                {({ copied, copy }) => (
+                  <Tooltip label={copied ? 'کپی شد!' : 'کپی کد'}>
+                    <ActionIcon color={copied ? 'teal' : 'gray'} onClick={copy} size="lg">
+                      {copied ? <IconCheck size={20} /> : <IconCopy size={20} />}
+                    </ActionIcon>
+                  </Tooltip>
+                )}
+              </CopyButton>
+              <CopyButton value={inviteLink}>
+                {({ copied, copy }) => (
+                  <Tooltip label={copied ? 'کپی شد!' : 'کپی لینک دعوت'}>
+                    <ActionIcon color={copied ? 'teal' : 'orange'} onClick={copy} size="lg" variant="filled">
+                      {copied ? <IconCheck size={20} /> : <IconCopy size={20} />}
+                    </ActionIcon>
+                  </Tooltip>
+                )}
+              </CopyButton>
+            </Group>
+          </Group>
+          <Text size="xs" c="dimmed" mt="xs">
+            مشتریان می‌توانند با این کد یا لینک دعوت، مستقیماً از شما نوبت رزرو کنند.
+          </Text>
+        </Paper>
+      )}
+
       <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="lg">
         <Paper p="md" withBorder>
           <Group>

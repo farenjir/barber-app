@@ -11,6 +11,73 @@ function generateToken(): string {
 }
 
 /**
+ * Generate a unique 6-character barber code
+ * Uses unambiguous characters: 23456789ABCDEFGHJKLMNPQRSTUVWXYZ (no 0, O, 1, I)
+ */
+export async function generateBarberCode(): Promise<string> {
+  const CHARS = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+  const CODE_LENGTH = 6;
+  
+  for (let attempts = 0; attempts < 10; attempts++) {
+    let code = '';
+    for (let i = 0; i < CODE_LENGTH; i++) {
+      const randomIndex = Math.floor(Math.random() * CHARS.length);
+      code += CHARS[randomIndex];
+    }
+    
+    // Check if code already exists
+    const existing = await sql`
+      SELECT id FROM barbers WHERE public_code = ${code}
+    ` as any[];
+    
+    if (existing.length === 0) {
+      return code;
+    }
+  }
+  
+  throw new Error('Failed to generate unique barber code after 10 attempts');
+}
+
+/**
+ * Get barber by public code
+ */
+export async function getBarberByCode(code: string) {
+  const barbers = await sql`
+    SELECT b.*, u.name as user_name, u.telegram_id
+    FROM barbers b
+    JOIN users u ON b.user_id = u.id
+    WHERE b.public_code = ${code.toUpperCase()} AND b.is_active = true AND u.is_active = true
+  ` as any[];
+  
+  return barbers.length > 0 ? barbers[0] : null;
+}
+
+/**
+ * Ensure barber has a public code (backfill if null)
+ */
+export async function ensureBarberCode(barberId: number): Promise<string> {
+  const barbers = await sql`
+    SELECT public_code FROM barbers WHERE id = ${barberId}
+  ` as any[];
+  
+  if (barbers.length === 0) {
+    throw new Error('Barber not found');
+  }
+  
+  if (barbers[0].public_code) {
+    return barbers[0].public_code;
+  }
+  
+  // Generate and update
+  const code = await generateBarberCode();
+  await sql`
+    UPDATE barbers SET public_code = ${code} WHERE id = ${barberId}
+  `;
+  
+  return code;
+}
+
+/**
  * Hash a token for storage
  */
 async function hashToken(token: string): Promise<string> {
