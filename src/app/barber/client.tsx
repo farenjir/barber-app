@@ -132,12 +132,12 @@ export default function BarberDashboardClient({ data }: { data: BarberDashboardD
                       <Text fw={600}>{appt.customer_name}</Text>
                       <Text size="sm" c="dimmed">{appt.customer_phone}</Text>
                     </div>
-                    <div className="text-left">
+                    <Stack gap="xs" align="flex-start">
                       <Badge color={appt.status === 'confirmed' ? 'green' : 'orange'}>
                         {appt.status === 'confirmed' ? 'تأیید شده' : 'در انتظار'}
                       </Badge>
                       <Text size="sm" mt="xs">{time} - {appt.service_name}</Text>
-                    </div>
+                    </Stack>
                   </Group>
                 </Paper>
               );

@@ -1,0 +1,29 @@
+---
+description: Product domain and business rules
+---
+
+## نوبت‌آرا: Independent Barber Platform
+
+- **Multi-barber platform**, not a single salon
+- Each barber has their own:
+  - Working hours schedule
+  - Services list with individual prices
+  - Customer bookings
+  - Unique barber code for customer access
+
+## User Roles
+
+1. **Customers**: Telegram-only (book via bot with barber code)
+2. **Barbers**: Web panel at `/barber/*` (view bookings, manage services/hours)
+3. **Super Admin**: Web panel at `/admin/*` (manage all barbers, system-wide view)
+
+## Super Admin on Barber Pages
+
+- Super admin can access `/barber/*` routes
+- Show «بازگشت به داشبورد ادمین» link to return to `/admin`
+
+## Services Management
+
+- Inactive services remain in database/list
+- Inactive services are NOT bookable via Telegram
+- Barbers can toggle service active/inactive status

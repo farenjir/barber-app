@@ -1,0 +1,32 @@
+---
+description: UI stack and styling architecture
+alwaysApply: true
+---
+
+## UI Framework: Mantine 9.x Only
+
+- **Mantine packages in use**: `@mantine/core`, `@mantine/dates`, `@mantine/form`, `@mantine/hooks`, `@mantine/notifications`, `@mantine/modals`, `@mantine/charts`, `@mantine/schedule`
+- **Icons**: `@tabler/icons-react` only
+- **Font**: Vazirmatn (Persian RTL, `dir="rtl"`)
+
+## Forbidden Libraries
+
+- ❌ No Tailwind CSS (removed)
+- ❌ No shadcn/ui components
+- ❌ No Radix primitives
+- ❌ No `lucide-react` icons
+- ❌ No `clsx`, `tailwind-merge`, or `cn()` utility
+
+## Theme & Colors
+
+- Use Mantine's semantic color props: `c`, `bg`, `variant`, `color`
+- No hardcoded hex colors, no `bg-gray-*`, no `orange.9`
+- Theme switching via `ColorSchemeScript` + `MantineProvider` + header toggle
+- Light/dark modes must both work correctly
+- User preference persists in localStorage
+
+## RTL Support
+
+- App is Persian right-to-left
+- `<html lang="fa" dir="rtl" {...mantineHtmlProps}>`
+- All layouts must respect RTL

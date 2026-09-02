@@ -1,7 +1,7 @@
 import { requireBarber } from '@/lib/auth-server';
 import { sql } from '@/db/client';
 import { AppShell } from '@/components/MantineAppShell';
-import { Text } from '@mantine/core';
+import { Text, Center, Stack } from '@mantine/core';
 import BookClient from './client';
 
 export const dynamic = 'force-dynamic';
@@ -12,11 +12,9 @@ export default async function BarberBook() {
   const barber = await sql`SELECT id, display_name FROM barbers WHERE user_id = ${user.id}` as any[];
   if (barber.length === 0) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-6">
-        <div className="p-8 text-center">
-          <Text c="red">شما به عنوان آرایشگر ثبت نشده‌اید.</Text>
-        </div>
-      </div>
+      <Center style={{ minHeight: '100vh' }} p="xl">
+        <Text c="red" ta="center">شما به عنوان آرایشگر ثبت نشده‌اید.</Text>
+      </Center>
     );
   }
   

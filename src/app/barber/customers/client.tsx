@@ -1,6 +1,6 @@
 'use client';
 
-import { Table, Paper, Text, Badge } from '@mantine/core';
+import { Table, Paper, Text, Badge, Stack } from '@mantine/core';
 import { IconUsers } from '@tabler/icons-react';
 import { toJalaali } from 'jalaali-js';
 
@@ -18,9 +18,11 @@ interface CustomersClientProps {
 export default function CustomersClient({ customers }: CustomersClientProps) {
   if (customers === null || customers.length === 0) {
     return (
-      <Paper p="xl" withBorder className="text-center">
-        <IconUsers size={48} className="mx-auto mb-4 opacity-50" />
-        <Text c="dimmed">مشتری‌ای یافت نشد</Text>
+      <Paper p="xl" withBorder>
+        <Stack align="center" gap="md">
+          <IconUsers size={48} opacity={0.5} />
+          <Text c="dimmed">مشتری‌ای یافت نشد</Text>
+        </Stack>
       </Paper>
     );
   }
