@@ -1,5 +1,6 @@
 import './globals.css';
 import { Vazirmatn } from 'next/font/google';
+import { ColorSchemeScript, mantineHtmlProps } from '@mantine/core';
 import { Providers } from '@/components/Providers';
 
 const vazirmatn = Vazirmatn({
@@ -18,7 +19,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="fa" dir="rtl">
+    <html lang="fa" dir="rtl" {...mantineHtmlProps}>
+      <head>
+        <ColorSchemeScript defaultColorScheme="dark" />
+      </head>
       <body className={vazirmatn.className}>
         <Providers>{children}</Providers>
       </body>

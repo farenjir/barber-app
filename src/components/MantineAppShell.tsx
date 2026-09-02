@@ -1,12 +1,13 @@
 'use client';
 
-import { ReactNode, useState } from 'react';
-import { AppShell as MantineAppShell, Burger, Group, Title, NavLink, Text, ActionIcon } from '@mantine/core';
+import { ReactNode } from 'react';
+import { AppShell as MantineAppShell, Burger, Group, Title, NavLink, Text, ActionIcon, useComputedColorScheme, useMantineColorScheme } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { usePathname } from 'next/navigation';
 import { 
   IconLogout, IconLayoutDashboard, IconCalendar, IconScissors, 
-  IconClock, IconUserPlus, IconUsers, IconSettings, IconAlertTriangle 
+  IconClock, IconUserPlus, IconUsers, IconSettings, IconAlertTriangle,
+  IconSun, IconMoon
 } from '@tabler/icons-react';
 import Link from 'next/link';
 
@@ -41,6 +42,12 @@ export function AppShell({ children, userName, userRole, barberName, pageTitle, 
   const [opened, { toggle }] = useDisclosure();
   const pathname = usePathname();
   const links = userRole === 'barber' ? barberLinks : adminLinks;
+  const { setColorScheme } = useMantineColorScheme();
+  const computedColorScheme = useComputedColorScheme('dark');
+
+  const toggleColorScheme = () => {
+    setColorScheme(computedColorScheme === 'dark' ? 'light' : 'dark');
+  };
 
   return (
     <MantineAppShell
@@ -56,7 +63,21 @@ export function AppShell({ children, userName, userRole, barberName, pageTitle, 
       <MantineAppShell.Header>
         <Group h="100%" px="md" justify="space-between">
           <Title order={2}>{pageTitle}</Title>
-          <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
+          <Group gap="xs">
+            <ActionIcon
+              onClick={toggleColorScheme}
+              variant="subtle"
+              size="lg"
+              aria-label="تغییر تم"
+            >
+              {computedColorScheme === 'dark' ? (
+                <IconSun size={20} stroke={1.5} />
+              ) : (
+                <IconMoon size={20} stroke={1.5} />
+              )}
+            </ActionIcon>
+            <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
+          </Group>
         </Group>
       </MantineAppShell.Header>
 

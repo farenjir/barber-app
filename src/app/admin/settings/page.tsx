@@ -1,6 +1,7 @@
 import { requireAdmin } from '@/lib/auth-server';
 import { AppShell } from '@/components/MantineAppShell';
-import { Paper, Text, Stack, Title, Code, Divider } from '@mantine/core';
+import { Paper, Text, Stack, Group, Code } from '@mantine/core';
+import { IconSettings } from '@tabler/icons-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,53 +29,53 @@ export default async function AdminSettings() {
       pageTitle="تنظیمات"
     >
       <Stack gap="md">
-        <Paper p="lg" withBorder>
-          <Title order={3} mb="md">تنظیمات محیطی</Title>
-          <Text size="sm" c="dimmed" mb="lg">
-            این تنظیمات از متغیرهای محیطی (Environment Variables) خوانده می‌شوند.
-            برای تغییر، به تنظیمات Vercel مراجعه کنید.
-          </Text>
-          
-          <Stack gap="sm">
-            {settings.map((setting) => (
-              <Paper key={setting.key} p="md" withBorder style={{ backgroundColor: 'var(--mantine-color-gray-0)' }}>
-                <Stack gap="xs">
-                  <Text fw={600}>{setting.label}</Text>
-                  <Code>{setting.key}</Code>
-                  <Text size="sm" c="blue">{setting.value}</Text>
-                </Stack>
-              </Paper>
-            ))}
+        <Paper p="md" withBorder>
+          <Stack gap="md">
+            <Text fw={600} size="lg">تنظیمات محیطی</Text>
+            <Text size="sm" c="dimmed">
+              این تنظیمات از متغیرهای محیطی (Environment Variables) خوانده می‌شوند.
+              برای تغییر، به تنظیمات Vercel مراجعه کنید.
+            </Text>
+            
+            <Stack gap="xs">
+              {settings.map((setting) => (
+                <Paper key={setting.key} p="md" withBorder radius="md">
+                  <Group justify="space-between" align="flex-start" wrap="nowrap">
+                    <Stack gap={4} style={{ flex: 1 }}>
+                      <Text fw={500}>{setting.label}</Text>
+                      <Code c="dimmed" fz="xs">{setting.key}</Code>
+                    </Stack>
+                    <Text fw={500} style={{ flexShrink: 0 }}>{setting.value}</Text>
+                  </Group>
+                </Paper>
+              ))}
+            </Stack>
           </Stack>
         </Paper>
         
-        <Paper p="lg" withBorder>
-          <Title order={3} mb="md">راهنمای متغیرها</Title>
-          <Stack gap="sm">
-            <div>
-              <Text fw={600} size="sm">SALON_NAME</Text>
-              <Text size="sm" c="dimmed">نام پلتفرم که در پیام‌های ربات و پنل نمایش داده می‌شود</Text>
-            </div>
-            <Divider />
-            <div>
-              <Text fw={600} size="sm">APP_URL</Text>
-              <Text size="sm" c="dimmed">آدرس اصلی وب اپلیکیشن برای لینک‌های magic link و وب‌هوک تلگرام</Text>
-            </div>
-            <Divider />
-            <div>
-              <Text fw={600} size="sm">ADMIN_TELEGRAM_IDS</Text>
-              <Text size="sm" c="dimmed">لیست Telegram ID های سوپر ادمین‌ها (جدا شده با ویرگول)</Text>
-            </div>
-            <Divider />
-            <div>
-              <Text fw={600} size="sm">TELEGRAM_BOT_TOKEN</Text>
-              <Text size="sm" c="dimmed">توکن ربات تلگرام دریافت شده از @BotFather</Text>
-            </div>
-            <Divider />
-            <div>
-              <Text fw={600} size="sm">DATABASE_URL</Text>
-              <Text size="sm" c="dimmed">رشته اتصال به پایگاه داده PostgreSQL</Text>
-            </div>
+        <Paper p="md" withBorder>
+          <Stack gap="md">
+            <Group gap="xs">
+              <IconSettings size={20} />
+              <Text fw={600} size="lg">راهنمای متغیرها</Text>
+            </Group>
+            <Stack gap="sm">
+              <Text size="sm" c="dimmed">
+                • <Text component="span" fw={500} inherit>SALON_NAME:</Text> نام پلتفرم که در پیام‌های ربات و پنل نمایش داده می‌شود
+              </Text>
+              <Text size="sm" c="dimmed">
+                • <Text component="span" fw={500} inherit>APP_URL:</Text> آدرس اصلی وب اپلیکیشن برای لینک‌های magic link و وب‌هوک تلگرام
+              </Text>
+              <Text size="sm" c="dimmed">
+                • <Text component="span" fw={500} inherit>ADMIN_TELEGRAM_IDS:</Text> لیست Telegram ID های سوپر ادمین‌ها (جدا شده با ویرگول)
+              </Text>
+              <Text size="sm" c="dimmed">
+                • <Text component="span" fw={500} inherit>TELEGRAM_BOT_TOKEN:</Text> توکن ربات تلگرام دریافت شده از @BotFather
+              </Text>
+              <Text size="sm" c="dimmed">
+                • <Text component="span" fw={500} inherit>DATABASE_URL:</Text> رشته اتصال به پایگاه داده PostgreSQL
+              </Text>
+            </Stack>
           </Stack>
         </Paper>
       </Stack>
