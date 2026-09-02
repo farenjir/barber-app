@@ -15,7 +15,6 @@ const theme = createTheme({
   primaryColor: 'orange',
   defaultRadius: 'md',
   colors: {
-    // Warm gold/amber theme for نوبت‌آرا
     orange: [
       '#fff4e6',
       '#ffe8cc',
