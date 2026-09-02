@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Button, Modal, TextInput, NumberInput, Table, Badge, Group, Stack, ActionIcon, Switch } from '@mantine/core';
+import { Button, Modal, TextInput, NumberInput, Table, Badge, Group, Stack, ActionIcon, Switch, Text } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
 import { IconPlus, IconEdit } from '@tabler/icons-react';
@@ -124,7 +124,7 @@ export default function ServicesClient({ barberId, initialServices }: ServicesCl
       </Group>
 
       {services.length === 0 ? (
-        <p className="text-center py-8 text-gray-600">هنوز خدمتی اضافه نکرده‌اید</p>
+        <Text ta="center" py="xl" c="dimmed">هنوز خدمتی اضافه نکرده‌اید</Text>
       ) : (
         <Table striped highlightOnHover>
           <Table.Thead>

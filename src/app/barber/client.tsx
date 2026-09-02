@@ -21,14 +21,14 @@ export default function BarberDashboardClient({ data }: { data: BarberDashboardD
     <Stack>
       {/* Barber Code Card */}
       {data.barber.public_code && (
-        <Paper p="md" withBorder bg="orange.9">
+        <Paper p="md" withBorder bg="orange" c="white">
           <Stack gap="md">
             <Group justify="space-between" wrap="wrap">
               <Group>
-                <IconKey size={32} style={{ color: 'white' }} />
+                <IconKey size={32} />
                 <div>
-                  <Text size="xs" c="white" opacity={0.8}>کد آرایشگر شما</Text>
-                  <Text size="xl" fw={700} tt="uppercase" c="white">{data.barber.public_code}</Text>
+                  <Text size="xs" c="dimmed">کد آرایشگر شما</Text>
+                  <Text size="xl" fw={700} tt="uppercase">{data.barber.public_code}</Text>
                 </div>
               </Group>
               <CopyButton value={data.barber.public_code}>
@@ -42,9 +42,9 @@ export default function BarberDashboardClient({ data }: { data: BarberDashboardD
             
             <Group justify="space-between" wrap="wrap" align="center">
               <div style={{ flex: 1, minWidth: 200 }}>
-                <Text size="xs" c="white" opacity={0.8} mb={4}>لینک دعوت</Text>
-                <Link href={inviteLink} target="_blank" style={{ color: 'white', textDecoration: 'underline' }}>
-                  <Text size="sm" c="white" style={{ wordBreak: 'break-all' }}>
+                <Text size="xs" c="dimmed" mb={4}>لینک دعوت</Text>
+                <Link href={inviteLink} target="_blank" style={{ textDecoration: 'underline' }}>
+                  <Text size="sm" inherit style={{ wordBreak: 'break-all' }}>
                     {inviteLink}
                   </Text>
                 </Link>
@@ -59,7 +59,7 @@ export default function BarberDashboardClient({ data }: { data: BarberDashboardD
             </Group>
           </Stack>
           
-          <Text size="xs" c="white" opacity={0.8} mt="md">
+          <Text size="xs" c="dimmed" mt="md">
             مشتریان می‌توانند با این کد یا لینک دعوت، مستقیماً از شما نوبت رزرو کنند.
           </Text>
         </Paper>
@@ -148,33 +148,43 @@ export default function BarberDashboardClient({ data }: { data: BarberDashboardD
 
       <SimpleGrid cols={{ base: 2, sm: 5 }} spacing="md">
         <Link href="/barber/calendar">
-          <Paper p="lg" withBorder className="hover:bg-gray-800 transition-colors text-center">
-            <IconCalendar size={32} className="mx-auto mb-2" />
-            <Text size="sm" fw={600}>تقویم</Text>
+          <Paper p="lg" withBorder style={{ textAlign: 'center', transition: 'background-color 150ms' }}>
+            <Stack gap="xs" align="center">
+              <IconCalendar size={32} />
+              <Text size="sm" fw={600}>تقویم</Text>
+            </Stack>
           </Paper>
         </Link>
         <Link href="/barber/services">
-          <Paper p="lg" withBorder className="hover:bg-gray-800 transition-colors text-center">
-            <IconScissors size={32} className="mx-auto mb-2" />
-            <Text size="sm" fw={600}>خدمات</Text>
+          <Paper p="lg" withBorder style={{ textAlign: 'center', transition: 'background-color 150ms' }}>
+            <Stack gap="xs" align="center">
+              <IconScissors size={32} />
+              <Text size="sm" fw={600}>خدمات</Text>
+            </Stack>
           </Paper>
         </Link>
         <Link href="/barber/hours">
-          <Paper p="lg" withBorder className="hover:bg-gray-800 transition-colors text-center">
-            <IconClock size={32} className="mx-auto mb-2" />
-            <Text size="sm" fw={600}>ساعات کاری</Text>
+          <Paper p="lg" withBorder style={{ textAlign: 'center', transition: 'background-color 150ms' }}>
+            <Stack gap="xs" align="center">
+              <IconClock size={32} />
+              <Text size="sm" fw={600}>ساعات کاری</Text>
+            </Stack>
           </Paper>
         </Link>
         <Link href="/barber/book">
-          <Paper p="lg" withBorder className="hover:bg-gray-800 transition-colors text-center">
-            <IconCalendar size={32} className="mx-auto mb-2" />
-            <Text size="sm" fw={600}>نوبت دستی</Text>
+          <Paper p="lg" withBorder style={{ textAlign: 'center', transition: 'background-color 150ms' }}>
+            <Stack gap="xs" align="center">
+              <IconCalendar size={32} />
+              <Text size="sm" fw={600}>نوبت دستی</Text>
+            </Stack>
           </Paper>
         </Link>
         <Link href="/barber/customers">
-          <Paper p="lg" withBorder className="hover:bg-gray-800 transition-colors text-center">
-            <IconCalendar size={32} className="mx-auto mb-2" />
-            <Text size="sm" fw={600}>مشتریان</Text>
+          <Paper p="lg" withBorder style={{ textAlign: 'center', transition: 'background-color 150ms' }}>
+            <Stack gap="xs" align="center">
+              <IconCalendar size={32} />
+              <Text size="sm" fw={600}>مشتریان</Text>
+            </Stack>
           </Paper>
         </Link>
       </SimpleGrid>
