@@ -2,11 +2,13 @@
 
 import { useState } from 'react';
 import { WeekView, ScheduleEventData } from '@mantine/schedule';
-import { Paper, Badge, Stack, Group, Modal, Text, Divider } from '@mantine/core';
+import { Paper, Badge, Stack, Group, Modal, Text, Divider, Button } from '@mantine/core';
+import { notifications } from '@mantine/notifications';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 import { toJalaali } from 'jalaali-js';
+import { confirmAppointment, rejectAppointment } from '../appointments/actions';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -45,6 +47,7 @@ export default function CalendarClient({ appointments, startTime, endTime }: Cal
   const [currentDate, setCurrentDate] = useState<Date | string>(new Date());
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [modalOpened, setModalOpened] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // Normalize TIME fields from postgres (could be Date objects) to HH:mm:ss strings
   const normalizedStartTime = typeof startTime === 'string' ? startTime : 
@@ -137,6 +140,70 @@ export default function CalendarClient({ appointments, startTime, endTime }: Cal
     return status === 'confirmed' ? 'green' : 'orange';
   };
 
+  const handleConfirm = async () => {
+    if (!selectedAppointment) return;
+    
+    setIsProcessing(true);
+    try {
+      const result = await confirmAppointment(selectedAppointment.id);
+      if (result.success) {
+        notifications.show({
+          title: 'موفق',
+          message: 'نوبت تأیید شد',
+          color: 'green',
+        });
+        setModalOpened(false);
+        setSelectedAppointment(null);
+      } else {
+        notifications.show({
+          title: 'خطا',
+          message: result.error || 'خطا در تأیید نوبت',
+          color: 'red',
+        });
+      }
+    } catch (error) {
+      notifications.show({
+        title: 'خطا',
+        message: 'خطا در تأیید نوبت',
+        color: 'red',
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleReject = async () => {
+    if (!selectedAppointment) return;
+    
+    setIsProcessing(true);
+    try {
+      const result = await rejectAppointment(selectedAppointment.id);
+      if (result.success) {
+        notifications.show({
+          title: 'موفق',
+          message: 'نوبت رد شد',
+          color: 'blue',
+        });
+        setModalOpened(false);
+        setSelectedAppointment(null);
+      } else {
+        notifications.show({
+          title: 'خطا',
+          message: result.error || 'خطا در رد نوبت',
+          color: 'red',
+        });
+      }
+    } catch (error) {
+      notifications.show({
+        title: 'خطا',
+        message: 'خطا در رد نوبت',
+        color: 'red',
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   return (
     <Stack>
       <Paper withBorder>
@@ -215,6 +282,33 @@ export default function CalendarClient({ appointments, startTime, endTime }: Cal
                 {getStatusLabel(selectedAppointment.status)}
               </Badge>
             </div>
+
+            {selectedAppointment.status === 'pending' && (
+              <>
+                <Divider />
+                <Group gap="sm">
+                  <Button
+                    flex={1}
+                    color="green"
+                    onClick={handleConfirm}
+                    loading={isProcessing}
+                    disabled={isProcessing}
+                  >
+                    تأیید
+                  </Button>
+                  <Button
+                    flex={1}
+                    color="red"
+                    variant="outline"
+                    onClick={handleReject}
+                    loading={isProcessing}
+                    disabled={isProcessing}
+                  >
+                    رد
+                  </Button>
+                </Group>
+              </>
+            )}
           </Stack>
         )}
       </Modal>
