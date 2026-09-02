@@ -1,159 +1,144 @@
 'use client';
 
-import { useEffect } from 'react';
-import { AppShell } from '@/components/AppShell';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { UserPlus, Check } from 'lucide-react';
+import { useState } from 'react';
+import { Button, Select, TextInput, Paper, Stack, Group, Alert } from '@mantine/core';
+import { DateTimePicker } from '@mantine/dates';
+import { useForm } from '@mantine/form';
+import { notifications } from '@mantine/notifications';
+import { IconCalendar, IconCheck } from '@tabler/icons-react';
+import { createAppointment } from './actions';
+import dayjs from 'dayjs';
+import 'dayjs/locale/fa';
+import timezone from 'dayjs/plugin/timezone';
+import utc from 'dayjs/plugin/utc';
 
-export default function BarberBookClient({
-  user,
-  barberName,
-  services,
-  days,
-  availableSlots,
-  searchParams,
-}: any) {
-  useEffect(() => {
-    const form = document.getElementById('booking-form') as HTMLFormElement;
-    if (!form) return;
+dayjs.extend(utc);
+dayjs.extend(timezone);
+dayjs.locale('fa');
 
-    const serviceSelect = form.querySelector('[name="service"]') as HTMLSelectElement;
-    const dateSelect = form.querySelector('[name="date"]') as HTMLSelectElement;
+interface Service {
+  id: number;
+  name: string;
+  duration_minutes: number;
+  price_toman: number;
+}
 
-    const handleChange = () => {
-      const service = serviceSelect.value;
-      const date = dateSelect.value;
-      if (service && date) {
-        window.location.href = `/barber/book?service=${service}&date=${date}`;
-      }
-    };
+interface BookClientProps {
+  barberId: number;
+  services: Service[];
+}
 
-    serviceSelect?.addEventListener('change', handleChange);
-    dateSelect?.addEventListener('change', handleChange);
+export default function BookClient({ barberId, services }: BookClientProps) {
+  const [success, setSuccess] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-    return () => {
-      serviceSelect?.removeEventListener('change', handleChange);
-      dateSelect?.removeEventListener('change', handleChange);
-    };
-  }, []);
+  const form = useForm({
+    initialValues: {
+      serviceId: '',
+      datetime: null as Date | null,
+      name: '',
+      phone: '',
+    },
+    validate: {
+      serviceId: (value) => (!value ? 'انتخاب خدمت الزامی است' : null),
+      datetime: (value) => (!value ? 'انتخاب زمان الزامی است' : null),
+      name: (value) => (value.length < 2 ? 'نام باید حداقل 2 کاراکتر باشد' : null),
+      phone: (value) => (value.length < 10 ? 'شماره تلفن نامعتبر است' : null),
+    },
+  });
+
+  const handleSubmit = async (values: typeof form.values) => {
+    if (!values.datetime) return;
+    
+    setSubmitting(true);
+    try {
+      await createAppointment(
+        barberId,
+        parseInt(values.serviceId),
+        values.datetime.toISOString(),
+        values.name,
+        values.phone
+      );
+      
+      setSuccess(true);
+      form.reset();
+      notifications.show({
+        title: 'موفق',
+        message: 'نوبت با موفقیت ثبت شد',
+        color: 'green',
+        icon: <IconCheck size={16} />,
+      });
+      
+      setTimeout(() => setSuccess(false), 3000);
+    } catch (error) {
+      notifications.show({
+        title: 'خطا',
+        message: 'مشکلی پیش آمد',
+        color: 'red',
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const serviceOptions = services.map(s => ({
+    value: s.id.toString(),
+    label: `${s.name} (${s.duration_minutes} دقیقه - ${s.price_toman.toLocaleString('fa-IR')} تومان)`,
+  }));
 
   return (
-    <AppShell
-      userName={user.name}
-      userRole="barber"
-      barberName={barberName}
-      pageTitle="رزرو دستی نوبت"
-    >
-      {searchParams.success && (
-        <div className="mb-6 p-4 bg-green-600/10 border border-green-600/20 rounded-lg text-green-600 flex items-center gap-2">
-          <Check className="w-5 h-5" />
+    <Paper p="lg" withBorder maw={600} mx="auto">
+      {success && (
+        <Alert icon={<IconCheck size={16} />} title="موفقیت" color="green" mb="md">
           نوبت با موفقیت ثبت شد
-        </div>
+        </Alert>
       )}
-      
-      <div className="max-w-2xl mx-auto">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <UserPlus className="w-6 h-6" />
-              ثبت نوبت جدید
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form id="booking-form" action="/api/barber/book" method="POST" className="space-y-4">
-              <div>
-                <Label htmlFor="service">خدمت</Label>
-                <select
-                  id="service"
-                  name="service"
-                  required
-                  className="w-full h-10 px-3 py-2 border border-input bg-background rounded-md text-sm"
-                  defaultValue={searchParams.service || ''}
-                >
-                  <option value="">انتخاب کنید...</option>
-                  {services.map((s: any) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name} ({s.duration_minutes}د - {s.price_toman.toLocaleString('fa-IR')}ت)
-                    </option>
-                  ))}
-                </select>
-              </div>
-              
-              <div>
-                <Label htmlFor="date">تاریخ</Label>
-                <select
-                  id="date"
-                  name="date"
-                  required
-                  className="w-full h-10 px-3 py-2 border border-input bg-background rounded-md text-sm"
-                  defaultValue={searchParams.date || ''}
-                >
-                  <option value="">انتخاب کنید...</option>
-                  {days.map((day: any) => (
-                    <option key={day.value} value={day.value}>
-                      {day.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              
-              {availableSlots.length > 0 && (
-                <div>
-                  <Label htmlFor="datetime">ساعت ({availableSlots.length} زمان آزاد)</Label>
-                  <select
-                    id="datetime"
-                    name="datetime"
-                    required
-                    className="w-full h-10 px-3 py-2 border border-input bg-background rounded-md text-sm"
-                  >
-                    <option value="">انتخاب کنید...</option>
-                    {availableSlots.map((slot: any) => (
-                      <option key={slot.value} value={slot.value}>
-                        {slot.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-              
-              <div>
-                <Label htmlFor="name">نام مشتری</Label>
-                <Input
-                  type="text"
-                  id="name"
-                  name="name"
-                  placeholder="نام و نام خانوادگی"
-                  required
-                />
-              </div>
-              
-              <div>
-                <Label htmlFor="phone">شماره تلفن</Label>
-                <Input
-                  type="tel"
-                  id="phone"
-                  name="phone"
-                  pattern="09[0-9]{9}"
-                  placeholder="09123456789"
-                  required
-                />
-              </div>
-              
-              <Button
-                type="submit"
-                disabled={!searchParams.service || !searchParams.date || availableSlots.length === 0}
-                className="w-full"
-                size="lg"
-              >
-                ثبت نوبت
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-      </div>
-    </AppShell>
+
+      <form onSubmit={form.onSubmit(handleSubmit)}>
+        <Stack>
+          <Select
+            label="خدمت"
+            placeholder="انتخاب کنید"
+            data={serviceOptions}
+            required
+            {...form.getInputProps('serviceId')}
+          />
+
+          <DateTimePicker
+            label="تاریخ و زمان نوبت"
+            placeholder="انتخاب کنید"
+            minDate={new Date()}
+            locale="fa"
+            required
+            {...form.getInputProps('datetime')}
+          />
+
+          <TextInput
+            label="نام مشتری"
+            placeholder="نام و نام خانوادگی"
+            required
+            {...form.getInputProps('name')}
+          />
+
+          <TextInput
+            label="شماره تلفن"
+            placeholder="09123456789"
+            required
+            {...form.getInputProps('phone')}
+          />
+
+          <Group justify="flex-end" mt="md">
+            <Button
+              type="submit"
+              size="lg"
+              leftSection={<IconCalendar size={20} />}
+              loading={submitting}
+            >
+              ثبت نوبت
+            </Button>
+          </Group>
+        </Stack>
+      </form>
+    </Paper>
   );
 }
