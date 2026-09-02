@@ -69,7 +69,7 @@ interface TelegramChat {
 
 // Booking state type
 interface BookingState {
-  step: 'barber' | 'service' | 'date' | 'time' | 'name' | 'phone' | 'confirm';
+  step: 'barber' | 'service' | 'date' | 'time' | 'name' | 'phone' | 'confirm' | 'register_barber_name';
   barberId?: number;
   barberName?: string;
   serviceId?: number;
@@ -157,7 +157,7 @@ async function clearUserState(userId: number): Promise<void> {
 async function handleStart(chatId: number, userId: number): Promise<void> {
   await clearUserState(userId);
   
-  const welcomeText = `${SALON_NAME} 💈\n\n${MESSAGES.welcome(SALON_NAME)}`;
+  const welcomeText = MESSAGES.welcome(SALON_NAME);
   
   // Check if user is barber or admin
   const user = await getUserByTelegramId(userId);
@@ -168,7 +168,7 @@ async function handleStart(chatId: number, userId: number): Promise<void> {
       [{ text: '📅 رزرو نوبت جدید' }],
       [{ text: '📋 نوبت‌های من' }, { text: '❌ لغو نوبت' }],
       [{ text: '💇 خدمات و قیمت‌ها' }, { text: '❓ راهنما' }],
-      ...(isStaff ? [[{ text: '🔐 ورود به پنل مدیریت' }]] : []),
+      ...(isStaff ? [[{ text: '🔐 ورود به پنل مدیریت' }]] : [[{ text: '✍️ ثبت‌نام آرایشگر' }]]),
     ],
     resize_keyboard: true,
     one_time_keyboard: false,
@@ -204,6 +204,89 @@ async function handlePanelCommand(chatId: number, userId: number, request?: Requ
   } catch (error) {
     console.error('Error creating magic link:', error);
     await sendMessage(chatId, 'خطا در ایجاد لینک ورود. لطفاً دوباره تلاش کنید.');
+  }
+}
+
+// Handle barber registration
+async function handleBarberRegistration(chatId: number, userId: number, request?: Request): Promise<void> {
+  // Check if user already has barber or admin role
+  const user = await getUserByTelegramId(userId);
+  
+  if (user && (user.role === 'barber' || user.role === 'super_admin')) {
+    await sendMessage(chatId, MESSAGES.barberRegistration.alreadyBarber);
+    return;
+  }
+  
+  // Ask for display name
+  await setUserState(userId, { step: 'register_barber_name' });
+  await sendMessage(chatId, MESSAGES.barberRegistration.requestDisplayName);
+}
+
+// Complete barber registration
+async function completeBarberRegistration(chatId: number, userId: number, displayName: string, request?: Request): Promise<void> {
+  try {
+    // Check if user exists
+    const existingUser = await getUserByTelegramId(userId);
+    
+    let userDbId: number;
+    
+    if (existingUser) {
+      // Update existing customer to barber
+      await sql`
+        UPDATE users
+        SET role = 'barber', name = ${displayName}
+        WHERE telegram_id = ${userId}
+      `;
+      userDbId = existingUser.id;
+    } else {
+      // Create new user with barber role
+      const [newUser] = await sql`
+        INSERT INTO users (telegram_id, role, name, is_active)
+        VALUES (${userId}, 'barber', ${displayName}, true)
+        RETURNING id
+      ` as any[];
+      userDbId = newUser.id;
+    }
+    
+    // Create barber record
+    const [barber] = await sql`
+      INSERT INTO barbers (user_id, display_name, is_active)
+      VALUES (${userDbId}, ${displayName}, true)
+      RETURNING id
+    ` as any[];
+    
+    const barberId = barber.id;
+    
+    // Seed working hours for all 7 weekdays (10:00-21:00, all open)
+    const workingHours = [
+      { weekday: 0, start_time: '10:00', end_time: '21:00', is_open: true },  // Sunday
+      { weekday: 1, start_time: '10:00', end_time: '21:00', is_open: true },  // Monday
+      { weekday: 2, start_time: '10:00', end_time: '21:00', is_open: true },  // Tuesday
+      { weekday: 3, start_time: '10:00', end_time: '21:00', is_open: true },  // Wednesday
+      { weekday: 4, start_time: '10:00', end_time: '21:00', is_open: true },  // Thursday
+      { weekday: 5, start_time: '10:00', end_time: '21:00', is_open: true },  // Friday
+      { weekday: 6, start_time: '10:00', end_time: '21:00', is_open: true },  // Saturday
+    ];
+    
+    for (const hours of workingHours) {
+      await sql`
+        INSERT INTO working_hours (barber_id, weekday, start_time, end_time, is_open)
+        VALUES (${barberId}, ${hours.weekday}, ${hours.start_time}, ${hours.end_time}, ${hours.is_open})
+      `;
+    }
+    
+    // Clear registration state
+    await clearUserState(userId);
+    
+    // Send magic link to panel
+    const appUrl = getAppUrl(request);
+    const token = await createMagicLink(userDbId);
+    const magicLink = `${appUrl}/login?token=${token}`;
+    
+    await sendMessage(chatId, MESSAGES.barberRegistration.success(magicLink));
+  } catch (error) {
+    console.error('Error in barber registration:', error);
+    await sendMessage(chatId, MESSAGES.barberRegistration.error);
   }
 }
 
@@ -386,6 +469,10 @@ async function handleText(chatId: number, userId: number, text: string, request?
     await handlePanelCommand(chatId, userId, request);
     return;
   }
+  if (text === '✍️ ثبت‌نام آرایشگر' || text === '/register_barber') {
+    await handleBarberRegistration(chatId, userId, request);
+    return;
+  }
 
   // Check for barber/admin commands
   const user = await getUserByTelegramId(userId);
@@ -403,6 +490,12 @@ async function handleText(chatId: number, userId: number, text: string, request?
   // State machine text input
   if (!state) {
     await handleStart(chatId, userId);
+    return;
+  }
+
+  if (state.step === 'register_barber_name') {
+    const displayName = text.trim();
+    await completeBarberRegistration(chatId, userId, displayName, request);
     return;
   }
 
