@@ -23,7 +23,7 @@ export default async function LoginPage({
               <p className="text-red-600 font-semibold">لینک منقضی شده یا نامعتبر است</p>
               <p>لطفاً لینک جدیدی از ربات تلگرام دریافت کنید.</p>
             </>
-          ) : error === 'forbidden' ? (
+          ) : error === 'forbidden' || error === 'customer' ? (
             <>
               <p className="text-red-600 font-semibold">شما به عنوان مشتری دسترسی به پنل وب ندارید</p>
               <p>لطفاً از ربات تلگرام برای رزرو نوبت استفاده کنید.</p>
