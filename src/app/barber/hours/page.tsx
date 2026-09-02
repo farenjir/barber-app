@@ -38,7 +38,12 @@ export default async function BarberHours() {
     SELECT * FROM working_hours WHERE barber_id = ${barberId} ORDER BY weekday
   ` as any[];
   
-  const hoursMap = new Map(workingHours.map((h: any) => [h.weekday, h]));
+  const hoursArray = workingHours.map((h: any) => ({
+    weekday: h.weekday,
+    is_open: h.is_open,
+    start_time: h.start_time?.toString().substring(0, 5) || '10:00',
+    end_time: h.end_time?.toString().substring(0, 5) || '21:00',
+  }));
 
   return (
     <AppShell
@@ -47,7 +52,7 @@ export default async function BarberHours() {
       barberName={barber[0].display_name}
       pageTitle="ساعات کاری"
     >
-      <HoursClient barberId={barberId} weekdays={WEEKDAYS} hoursMap={hoursMap} />
+      <HoursClient barberId={barberId} weekdays={WEEKDAYS} hoursArray={hoursArray} />
     </AppShell>
   );
 }
