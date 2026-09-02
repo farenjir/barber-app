@@ -34,7 +34,7 @@ export default async function BarberCalendar() {
   const startTime = workingHours[0]?.earliest || '10:00:00';
   const endTime = workingHours[0]?.latest || '21:00:00';
   
-  // Get appointments for the calendar
+  // Get appointments for the calendar (wider window for week navigation)
   const appointments = await sql`
     SELECT 
       a.id,
@@ -46,8 +46,8 @@ export default async function BarberCalendar() {
     FROM appointments a
     JOIN services s ON a.service_id = s.id
     WHERE a.barber_id = ${barberId}
-      AND a.appointment_time >= NOW() - INTERVAL '7 days'
-      AND a.appointment_time <= NOW() + INTERVAL '30 days'
+      AND a.appointment_time >= NOW() - INTERVAL '30 days'
+      AND a.appointment_time <= NOW() + INTERVAL '60 days'
       AND a.status IN ('pending', 'confirmed')
     ORDER BY a.appointment_time
   ` as any[];

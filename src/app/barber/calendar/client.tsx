@@ -2,21 +2,18 @@
 
 import { useState } from 'react';
 import { WeekView, ScheduleEventData } from '@mantine/schedule';
-import { Paper, Badge, Text, Stack, Group, Button } from '@mantine/core';
-import { IconChevronLeft, IconChevronRight, IconCalendarEvent } from '@tabler/icons-react';
+import { Paper, Badge, Stack, Group } from '@mantine/core';
 import dayjs from 'dayjs';
-import 'dayjs/locale/fa';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 import { toJalaali } from 'jalaali-js';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
-dayjs.locale('fa');
 
 interface Appointment {
   id: number;
-  appointment_time: string;
+  appointment_time: string | Date;
   duration_minutes: number;
   customer_name: string;
   status: string;
@@ -25,72 +22,106 @@ interface Appointment {
 
 interface CalendarClientProps {
   appointments: Appointment[];
-  startTime: string;
-  endTime: string;
+  startTime: string | Date;
+  endTime: string | Date;
 }
 
+// Persian weekday names
+const PERSIAN_WEEKDAYS = ['یکشنبه', 'دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنجشنبه', 'جمعه', 'شنبه'];
+
+// Persian month names
+const PERSIAN_MONTHS = [
+  'فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور',
+  'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'
+];
+
+// Persian numerals mapping
+const toPersianNumber = (num: number): string => {
+  const persianDigits = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
+  return num.toString().split('').map(digit => persianDigits[parseInt(digit)]).join('');
+};
+
 export default function CalendarClient({ appointments, startTime, endTime }: CalendarClientProps) {
-  const [currentDate, setCurrentDate] = useState(new Date());
+  const [currentDate, setCurrentDate] = useState<Date | string>(new Date());
+
+  // Normalize TIME fields from postgres (could be Date objects) to HH:mm:ss strings
+  const normalizedStartTime = typeof startTime === 'string' ? startTime : 
+    dayjs(startTime).format('HH:mm:ss');
+  const normalizedEndTime = typeof endTime === 'string' ? endTime : 
+    dayjs(endTime).format('HH:mm:ss');
 
   // Convert appointments to schedule events
   const events: ScheduleEventData[] = appointments.map((appt) => {
     const appointmentTime = dayjs(appt.appointment_time).tz('Asia/Tehran');
-    const endTime = appointmentTime.add(appt.duration_minutes, 'minute');
+    const eventEndTime = appointmentTime.add(appt.duration_minutes, 'minute');
     
     return {
       id: appt.id.toString(),
-      title: `${appt.customer_name} - ${appt.service_name}`,
+      title: `${appt.customer_name} — ${appt.service_name}`,
       start: appointmentTime.format('YYYY-MM-DD HH:mm:ss'),
-      end: endTime.format('YYYY-MM-DD HH:mm:ss'),
+      end: eventEndTime.format('YYYY-MM-DD HH:mm:ss'),
       color: appt.status === 'confirmed' ? 'green' : 'orange',
     };
   });
 
-  const handlePrevWeek = () => {
-    setCurrentDate(new Date(currentDate.getTime() - 7 * 24 * 60 * 60 * 1000));
+  // Format weekday with Jalali day number (e.g., "شنبه ۱۱")
+  const weekdayFormat = (dateStr: string): string => {
+    const date = dayjs(dateStr);
+    const gregorianDate = date.toDate();
+    const jDate = toJalaali(gregorianDate.getFullYear(), gregorianDate.getMonth() + 1, gregorianDate.getDate());
+    const weekdayIndex = gregorianDate.getDay();
+    const weekdayName = PERSIAN_WEEKDAYS[weekdayIndex];
+    const jalaliDay = toPersianNumber(jDate.jd);
+    return `${weekdayName} ${jalaliDay}`;
   };
 
-  const handleNextWeek = () => {
-    setCurrentDate(new Date(currentDate.getTime() + 7 * 24 * 60 * 60 * 1000));
+  // Format week label with Jalali range (e.g., "۱۱–۱۷ شهریور ۱۴۰۵")
+  const weekLabelFormat = (dateStr: string): string => {
+    // dateStr is the week start date
+    const weekStart = dayjs(dateStr);
+    const weekEnd = weekStart.add(6, 'day');
+    
+    const startGregorian = weekStart.toDate();
+    const endGregorian = weekEnd.toDate();
+    
+    const jStart = toJalaali(startGregorian.getFullYear(), startGregorian.getMonth() + 1, startGregorian.getDate());
+    const jEnd = toJalaali(endGregorian.getFullYear(), endGregorian.getMonth() + 1, endGregorian.getDate());
+    
+    // If same month and year
+    if (jStart.jm === jEnd.jm && jStart.jy === jEnd.jy) {
+      return `${toPersianNumber(jStart.jd)}–${toPersianNumber(jEnd.jd)} ${PERSIAN_MONTHS[jStart.jm - 1]} ${toPersianNumber(jStart.jy)}`;
+    }
+    // If different months but same year
+    if (jStart.jy === jEnd.jy) {
+      return `${toPersianNumber(jStart.jd)} ${PERSIAN_MONTHS[jStart.jm - 1]} – ${toPersianNumber(jEnd.jd)} ${PERSIAN_MONTHS[jEnd.jm - 1]} ${toPersianNumber(jStart.jy)}`;
+    }
+    // Different years
+    return `${toPersianNumber(jStart.jd)} ${PERSIAN_MONTHS[jStart.jm - 1]} ${toPersianNumber(jStart.jy)} – ${toPersianNumber(jEnd.jd)} ${PERSIAN_MONTHS[jEnd.jm - 1]} ${toPersianNumber(jEnd.jy)}`;
   };
 
-  const handleToday = () => {
-    setCurrentDate(new Date());
+  // Return current time in Asia/Tehran timezone
+  const getCurrentTime = () => {
+    return dayjs().tz('Asia/Tehran').format('YYYY-MM-DD HH:mm:ss');
   };
-
-  // Format current week in Jalali
-  const weekStart = dayjs(currentDate).startOf('week');
-  const jDate = toJalaali(weekStart.year(), weekStart.month() + 1, weekStart.date());
-  const jalaliWeek = `هفته ${jDate.jd} ${getJalaliMonthName(jDate.jm)} ${jDate.jy}`;
 
   return (
     <Stack>
-      <Paper p="md" withBorder>
-        <Group justify="space-between">
-          <Group>
-            <Button variant="subtle" onClick={handlePrevWeek} leftSection={<IconChevronRight size={16} />}>
-              هفته قبل
-            </Button>
-            <Button variant="filled" onClick={handleToday}>
-              امروز
-            </Button>
-            <Button variant="subtle" onClick={handleNextWeek} leftSection={<IconChevronLeft size={16} />}>
-              هفته بعد
-            </Button>
-          </Group>
-          <Text fw={600}>{jalaliWeek}</Text>
-        </Group>
-      </Paper>
-
       <Paper withBorder>
         <WeekView
           events={events}
           date={currentDate}
-          startTime={startTime}
-          endTime={endTime}
+          onDateChange={setCurrentDate}
+          startTime={normalizedStartTime}
+          endTime={normalizedEndTime}
           firstDayOfWeek={6}
+          weekendDays={[5]}
           highlightToday
           withCurrentTimeIndicator
+          getCurrentTime={getCurrentTime}
+          withWeekNumber={false}
+          withAllDaySlots={false}
+          weekdayFormat={weekdayFormat}
+          weekLabelFormat={weekLabelFormat}
         />
       </Paper>
 
@@ -102,12 +133,4 @@ export default function CalendarClient({ appointments, startTime, endTime }: Cal
       </Paper>
     </Stack>
   );
-}
-
-function getJalaliMonthName(month: number): string {
-  const months = [
-    'فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور',
-    'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'
-  ];
-  return months[month - 1];
 }
