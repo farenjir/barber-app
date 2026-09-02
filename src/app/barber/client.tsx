@@ -1,9 +1,12 @@
 'use client';
 
-import { Paper, SimpleGrid, Text, Badge, Stack, Group, CopyButton, ActionIcon, Tooltip } from '@mantine/core';
+import { useState } from 'react';
+import { Paper, SimpleGrid, Text, Badge, Stack, Group, CopyButton, ActionIcon, Tooltip, Button } from '@mantine/core';
 import { BarChart } from '@mantine/charts';
 import { IconCalendar, IconScissors, IconClock, IconCopy, IconCheck, IconKey } from '@tabler/icons-react';
+import { notifications } from '@mantine/notifications';
 import Link from 'next/link';
+import { confirmAppointment, rejectAppointment } from './appointments/actions';
 
 interface BarberDashboardData {
   barber: any;
@@ -14,8 +17,65 @@ interface BarberDashboardData {
 }
 
 export default function BarberDashboardClient({ data }: { data: BarberDashboardData }) {
+  const [processingAppt, setProcessingAppt] = useState<number | null>(null);
   const botUsername = process.env.NEXT_PUBLIC_BOT_USERNAME || 'BarberAppointmentAppBot';
   const inviteLink = `https://t.me/${botUsername}?start=${data.barber.public_code}`;
+
+  const handleConfirm = async (appointmentId: number) => {
+    setProcessingAppt(appointmentId);
+    try {
+      const result = await confirmAppointment(appointmentId);
+      if (result.success) {
+        notifications.show({
+          title: 'موفق',
+          message: 'نوبت تأیید شد',
+          color: 'green',
+        });
+      } else {
+        notifications.show({
+          title: 'خطا',
+          message: result.error || 'خطا در تأیید نوبت',
+          color: 'red',
+        });
+      }
+    } catch (error) {
+      notifications.show({
+        title: 'خطا',
+        message: 'خطا در تأیید نوبت',
+        color: 'red',
+      });
+    } finally {
+      setProcessingAppt(null);
+    }
+  };
+
+  const handleReject = async (appointmentId: number) => {
+    setProcessingAppt(appointmentId);
+    try {
+      const result = await rejectAppointment(appointmentId);
+      if (result.success) {
+        notifications.show({
+          title: 'موفق',
+          message: 'نوبت رد شد',
+          color: 'blue',
+        });
+      } else {
+        notifications.show({
+          title: 'خطا',
+          message: result.error || 'خطا در رد نوبت',
+          color: 'red',
+        });
+      }
+    } catch (error) {
+      notifications.show({
+        title: 'خطا',
+        message: 'خطا در رد نوبت',
+        color: 'red',
+      });
+    } finally {
+      setProcessingAppt(null);
+    }
+  };
   
   return (
     <Stack>
@@ -123,21 +183,49 @@ export default function BarberDashboardClient({ data }: { data: BarberDashboardD
                 hour: '2-digit',
                 minute: '2-digit',
               });
+              const isPending = appt.status === 'pending';
+              const isProcessing = processingAppt === appt.id;
 
               return (
                 <Paper key={appt.id} p="md" withBorder>
-                  <Group justify="space-between">
-                    <div>
-                      <Text fw={600}>{appt.customer_name}</Text>
-                      <Text size="sm" c="dimmed">{appt.customer_phone}</Text>
-                    </div>
-                    <Stack gap="xs" align="flex-start">
-                      <Badge color={appt.status === 'confirmed' ? 'green' : 'orange'}>
-                        {appt.status === 'confirmed' ? 'تأیید شده' : 'در انتظار'}
-                      </Badge>
-                      <Text size="sm" mt="xs">{time} - {appt.service_name}</Text>
-                    </Stack>
-                  </Group>
+                  <Stack gap="sm">
+                    <Group justify="space-between">
+                      <div>
+                        <Text fw={600}>{appt.customer_name}</Text>
+                        <Text size="sm" c="dimmed">{appt.customer_phone}</Text>
+                      </div>
+                      <Stack gap="xs" align="flex-start">
+                        <Badge color={appt.status === 'confirmed' ? 'green' : 'orange'}>
+                          {appt.status === 'confirmed' ? 'تأیید شده' : 'در انتظار'}
+                        </Badge>
+                        <Text size="sm" mt="xs">{time} - {appt.service_name}</Text>
+                      </Stack>
+                    </Group>
+                    
+                    {isPending && (
+                      <Group gap="sm">
+                        <Button
+                          size="sm"
+                          color="green"
+                          onClick={() => handleConfirm(appt.id)}
+                          loading={isProcessing}
+                          disabled={isProcessing}
+                        >
+                          تأیید
+                        </Button>
+                        <Button
+                          size="sm"
+                          color="red"
+                          variant="outline"
+                          onClick={() => handleReject(appt.id)}
+                          loading={isProcessing}
+                          disabled={isProcessing}
+                        >
+                          رد
+                        </Button>
+                      </Group>
+                    )}
+                  </Stack>
                 </Paper>
               );
             })}
