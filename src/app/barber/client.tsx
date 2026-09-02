@@ -22,36 +22,44 @@ export default function BarberDashboardClient({ data }: { data: BarberDashboardD
       {/* Barber Code Card */}
       {data.barber.public_code && (
         <Paper p="md" withBorder bg="orange.9">
-          <Group justify="space-between" wrap="wrap">
-            <Group>
-              <IconKey size={32} />
-              <div>
-                <Text size="xs" c="dimmed">کد آرایشگر شما</Text>
-                <Text size="xl" fw={700} tt="uppercase">{data.barber.public_code}</Text>
-              </div>
-            </Group>
-            <Group>
+          <Stack gap="md">
+            <Group justify="space-between" wrap="wrap">
+              <Group>
+                <IconKey size={32} style={{ color: 'white' }} />
+                <div>
+                  <Text size="xs" c="white" opacity={0.8}>کد آرایشگر شما</Text>
+                  <Text size="xl" fw={700} tt="uppercase" c="white">{data.barber.public_code}</Text>
+                </div>
+              </Group>
               <CopyButton value={data.barber.public_code}>
                 {({ copied, copy }) => (
-                  <Tooltip label={copied ? 'کپی شد!' : 'کپی کد'}>
-                    <ActionIcon color={copied ? 'teal' : 'gray'} onClick={copy} size="lg">
-                      {copied ? <IconCheck size={20} /> : <IconCopy size={20} />}
-                    </ActionIcon>
-                  </Tooltip>
-                )}
-              </CopyButton>
-              <CopyButton value={inviteLink}>
-                {({ copied, copy }) => (
-                  <Tooltip label={copied ? 'کپی شد!' : 'کپی لینک دعوت'}>
-                    <ActionIcon color={copied ? 'teal' : 'orange'} onClick={copy} size="lg" variant="filled">
-                      {copied ? <IconCheck size={20} /> : <IconCopy size={20} />}
-                    </ActionIcon>
-                  </Tooltip>
+                  <ActionIcon color={copied ? 'teal' : 'gray'} onClick={copy} size="lg" variant="filled">
+                    {copied ? <IconCheck size={20} /> : <IconCopy size={20} />}
+                  </ActionIcon>
                 )}
               </CopyButton>
             </Group>
-          </Group>
-          <Text size="xs" c="dimmed" mt="xs">
+            
+            <Group justify="space-between" wrap="wrap" align="center">
+              <div style={{ flex: 1, minWidth: 200 }}>
+                <Text size="xs" c="white" opacity={0.8} mb={4}>لینک دعوت</Text>
+                <Link href={inviteLink} target="_blank" style={{ color: 'white', textDecoration: 'underline' }}>
+                  <Text size="sm" c="white" style={{ wordBreak: 'break-all' }}>
+                    {inviteLink}
+                  </Text>
+                </Link>
+              </div>
+              <CopyButton value={inviteLink}>
+                {({ copied, copy }) => (
+                  <ActionIcon color={copied ? 'teal' : 'gray'} onClick={copy} size="lg" variant="filled">
+                    {copied ? <IconCheck size={20} /> : <IconCopy size={20} />}
+                  </ActionIcon>
+                )}
+              </CopyButton>
+            </Group>
+          </Stack>
+          
+          <Text size="xs" c="white" opacity={0.8} mt="md">
             مشتریان می‌توانند با این کد یا لینک دعوت، مستقیماً از شما نوبت رزرو کنند.
           </Text>
         </Paper>

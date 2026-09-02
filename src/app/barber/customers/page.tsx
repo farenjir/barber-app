@@ -52,6 +52,7 @@ export default async function BarberCustomers() {
       userRole="barber"
       barberName={barber[0].display_name}
       pageTitle="لیست مشتریان"
+      isSuperAdmin={user.role === 'super_admin'}
     >
       <CustomersClient customers={customers} />
     </AppShell>

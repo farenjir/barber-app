@@ -51,6 +51,7 @@ export default async function BarberHours() {
       userRole="barber"
       barberName={barber[0].display_name}
       pageTitle="ساعات کاری"
+      isSuperAdmin={user.role === 'super_admin'}
     >
       <HoursClient barberId={barberId} weekdays={WEEKDAYS} hoursArray={hoursArray} />
     </AppShell>

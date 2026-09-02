@@ -99,6 +99,7 @@ export default async function BarberDashboard() {
       userRole="barber"
       barberName={data.barber.display_name}
       pageTitle="داشبورد"
+      isSuperAdmin={user.role === 'super_admin'}
     >
       <BarberDashboardClient data={data} />
     </AppShell>

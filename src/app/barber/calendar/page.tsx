@@ -58,6 +58,7 @@ export default async function BarberCalendar() {
       userRole="barber"
       barberName={barber[0].display_name}
       pageTitle="تقویم نوبت‌ها"
+      isSuperAdmin={user.role === 'super_admin'}
     >
       <CalendarClient 
         appointments={appointments}
