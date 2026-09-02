@@ -34,14 +34,14 @@ export default function CalendarClient({ appointments, startTime, endTime }: Cal
 
   // Convert appointments to schedule events
   const events: ScheduleEventData[] = appointments.map((appt) => {
-    const start = new Date(appt.appointment_time);
-    const end = new Date(start.getTime() + appt.duration_minutes * 60000);
+    const appointmentTime = dayjs(appt.appointment_time).tz('Asia/Tehran');
+    const endTime = appointmentTime.add(appt.duration_minutes, 'minute');
     
     return {
       id: appt.id.toString(),
       title: `${appt.customer_name} - ${appt.service_name}`,
-      start: start.toISOString(),
-      end: end.toISOString(),
+      start: appointmentTime.format('YYYY-MM-DD HH:mm:ss'),
+      end: endTime.format('YYYY-MM-DD HH:mm:ss'),
       color: appt.status === 'confirmed' ? 'green' : 'orange',
     };
   });
