@@ -22,8 +22,44 @@ export const sql = new Proxy((() => {}) as any, {
   },
 }) as ReturnType<typeof neon>;
 
+export type User = {
+  id: number;
+  telegram_id: number;
+  role: 'customer' | 'barber' | 'super_admin';
+  name: string;
+  phone: string | null;
+  is_active: boolean;
+  created_at: Date;
+};
+
+export type Barber = {
+  id: number;
+  user_id: number;
+  display_name: string;
+  is_active: boolean;
+  created_at: Date;
+};
+
+export type MagicLink = {
+  id: number;
+  token_hash: string;
+  user_id: number;
+  expires_at: Date;
+  used_at: Date | null;
+  created_at: Date;
+};
+
+export type Session = {
+  id: number;
+  token_hash: string;
+  user_id: number;
+  expires_at: Date;
+  created_at: Date;
+};
+
 export type Service = {
   id: number;
+  barber_id: number;
   name: string;
   duration_minutes: number;
   price_toman: number;
@@ -34,6 +70,7 @@ export type Service = {
 
 export type WorkingHours = {
   id: number;
+  barber_id: number;
   weekday: number;
   start_time: string;
   end_time: string;
@@ -44,6 +81,7 @@ export type WorkingHours = {
 
 export type BlockedSlot = {
   id: number;
+  barber_id: number;
   start_time: Date;
   end_time: Date;
   reason: string | null;
@@ -52,6 +90,7 @@ export type BlockedSlot = {
 
 export type Appointment = {
   id: number;
+  barber_id: number;
   service_id: number;
   customer_telegram_id: number;
   customer_name: string;

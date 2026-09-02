@@ -1,8 +1,8 @@
 # 🪒 Barber Appointment Bot | ربات رزرو نوبت آرایشگاه
 
-A production-ready Telegram booking bot for hairdressers/barbers and their customers, built with Next.js, Vercel Chat SDK, and PostgreSQL.
+A production-ready Telegram booking bot for hairdressers/barbers and their customers, built with Next.js and PostgreSQL. Supports multiple barbers with separate schedules and services.
 
-یک ربات تلگرام آماده برای رزرو نوبت آرایشگاه، ساخته شده با Next.js، Vercel Chat SDK و PostgreSQL.
+یک ربات تلگرام آماده برای رزرو نوبت آرایشگاه، ساخته شده با Next.js و PostgreSQL. پشتیبانی از چند آرایشگر با برنامه‌های کاری و خدمات جداگانه.
 
 **Live Bot:** [@BarberAppointmentAppBot](https://t.me/BarberAppointmentAppBot)
 
@@ -10,29 +10,51 @@ A production-ready Telegram booking bot for hairdressers/barbers and their custo
 
 ## 📋 Features | ویژگی‌ها
 
-### For Customers | برای مشتریان
-- 📅 **Book Appointments** - Select service, date, and time with Persian calendar (Jalali)
-- 📋 **View Bookings** - See all upcoming appointments with status
-- ❌ **Cancel Bookings** - Cancel appointments with admin notification
-- 💇 **Browse Services** - View available services with prices and duration
-- ⏰ **Reminders** - Automatic 24-hour reminders (daily at 08:00 Asia/Tehran)
+### Three-Role System | سیستم سه نقشی
 
-### For Admins | برای مدیران
-- ✅ **Confirm/Reject** - Review and respond to booking requests
-- 📊 **Daily View** - `/today` - See today's appointments
-- 📅 **Weekly View** - `/week` - See upcoming week's appointments
-- 🚫 **Block Time** - Block specific time ranges
-- 🛠️ **Manage Services** - Add, edit, or disable services
-- ⏰ **Working Hours** - Configure opening hours per weekday
+The system supports three distinct roles with different interfaces:
+
+#### 🧑 Customer | مشتری
+- **Telegram bot only** - No web access
+- 📅 **Book Appointments** - Select barber, service, date, and time
+- 📋 **View Bookings** - See upcoming appointments with status
+- ❌ **Cancel Bookings** - Cancel appointments with barber notification
+- 💇 **Browse Services** - View services by barber with prices
+- ⏰ **Reminders** - Automatic reminders (daily at 08:00 Asia/Tehran)
+
+#### 💈 Barber | آرایشگر
+- **Telegram bot + web panel**
+- **Telegram features:**
+  - ✅ **Confirm/Reject** - Review and respond to booking requests
+  - 📊 `/today` - See today's appointments
+  - 📅 `/week` - See this week's appointments
+  - 🔐 `/panel` - Get magic link to web panel
+- **Web panel (`/barber`):**
+  - 📅 **Calendar view** - Week view with Jalali dates
+  - 💇 **Services CRUD** - Create, edit, disable services
+  - 🕐 **Working hours** - Configure opening hours per weekday
+  - 🚫 **Block slots** - Block specific time ranges
+  - 👥 **Customer list** - View customers from appointments
+  - ➕ **Manual booking** - Create appointments manually
+
+#### 👨‍💼 Super Admin | سوپر ادمین
+- **Web only (`/admin`)**
+- 👨‍💼 **Manage barbers** - Add/disable barbers by Telegram ID
+- 📊 **View all appointments** - Filter by barber, date, status
+- 👥 **View all customers** - Complete customer database
+- ⚙️ **Salon settings** - Configure salon name and settings
+- 📈 **Dashboard** - Overview of all salon activity
+- **Telegram:** `/panel` command only (for web access link)
 
 ### Technical Features | ویژگی‌های فنی
-- 🌐 **Persian UI** - All user-facing text in Farsi
+- 🌐 **Persian UI** - All user-facing text in Farsi (bot + web)
 - 📅 **Jalali Calendar** - Persian calendar for date display
 - 🕐 **Timezone** - Asia/Tehran timezone handling
-- 🔒 **No Double-Booking** - Slot validation prevents overlaps
+- 🔒 **Per-Barber Slots** - No overlap between barbers
+- 🔐 **Magic Link Auth** - Secure web panel access via Telegram
 - 💾 **Durable State** - PostgreSQL-backed conversation state
-- 🔄 **Idempotent Reminders** - Prevents duplicate reminder messages
-- ✅ **Production Ready** - TypeScript, tests, migrations, and seed data
+- 🔄 **Idempotent Reminders** - Prevents duplicate messages
+- ✅ **Production Ready** - TypeScript, tests, migrations, RTL UI
 
 ---
 
@@ -66,10 +88,15 @@ TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
 TELEGRAM_WEBHOOK_SECRET_TOKEN=your_random_secret_here
 
 # Find your Telegram user ID (send /start to @userinfobot)
-ADMIN_TELEGRAM_IDS=123456789,987654321
+# This will be the super admin
+ADMIN_TELEGRAM_IDS=123456789
 
 # Database connection string (Neon, Vercel Postgres, or other PostgreSQL)
 DATABASE_URL=postgresql://user:password@host:5432/database
+
+# Web application URL (for magic link authentication)
+# Use your Vercel deployment URL or custom domain
+APP_URL=https://your-domain.com
 
 # Optional: customize salon name
 SALON_NAME=سالن زیبایی
@@ -78,8 +105,15 @@ SALON_NAME=سالن زیبایی
 3. **Run migrations and seed data:**
 ```bash
 npm run db:migrate
+npm run db:migrate:data  # Migrate existing data if upgrading
 npm run db:seed
 ```
+
+This will:
+- Create all database tables
+- Create a super admin user from `ADMIN_TELEGRAM_IDS`
+- Create a default barber with sample services
+- Set up default working hours
 
 4. **Start development server:**
 ```bash
@@ -88,7 +122,7 @@ npm run dev
 
 5. **Set up Telegram webhook:**
 
-For production deployment, configure the webhook URL with BotFather:
+For production deployment, configure the webhook URL:
 
 ```bash
 curl -X POST "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/setWebhook" \
@@ -99,46 +133,62 @@ curl -X POST "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/setWebhook" \
   }'
 ```
 
-**Note:** During local development, the bot automatically uses polling mode. The webhook is only needed for production.
-
 ---
 
 ## 🔧 Configuration
 
-### Admin Setup | تنظیمات مدیر
+### Role Setup | تنظیمات نقش‌ها
 
-**Finding Your Telegram User ID:**
+#### Setting Up Super Admin
 
-1. Open Telegram and search for [@userinfobot](https://t.me/userinfobot)
-2. Send `/start` to the bot
-3. Copy your numeric user ID
-4. Add it to `ADMIN_TELEGRAM_IDS` in `.env` (comma-separated for multiple admins)
+1. Find your Telegram User ID:
+   - Open [@userinfobot](https://t.me/userinfobot) in Telegram
+   - Send `/start`
+   - Copy your numeric user ID
+2. Add it to `ADMIN_TELEGRAM_IDS` in `.env` (comma-separated for multiple admins)
+3. After running migrations and seed, this user will be a super admin
 
-**Admin Commands:**
-- `/today` - View today's appointments
-- `/week` - View next week's appointments  
-- `/block` - Block time slots (coming soon)
-- `/services` - Manage services (coming soon)
-- `/hours` - Manage working hours (coming soon)
-- `/help` - Show help
+#### Adding Barbers
+
+**Via Web Panel (Super Admin):**
+1. Super admin sends `/panel` to the bot
+2. Opens the magic link
+3. Navigates to `/admin/barbers`
+4. Clicks "Add Barber"
+5. Enters barber's Telegram ID and name
+
+**Direct Database:**
+```sql
+-- First, create a user
+INSERT INTO users (telegram_id, role, name, is_active)
+VALUES (987654321, 'barber', 'آرایشگر نمونه', true);
+
+-- Then create barber record
+INSERT INTO barbers (user_id, display_name, is_active)
+VALUES ((SELECT id FROM users WHERE telegram_id = 987654321), 'آرایشگر نمونه', true);
+```
 
 ### Services Configuration | تنظیم خدمات
 
-Default services are seeded automatically:
+Each barber has their own services. Default services are seeded:
 - **Haircut** (اصلاح مو) - 45 min, 350,000 Toman
 - **Beard Trim** (اصلاح ریش) - 20 min, 150,000 Toman
 - **Hair Color** (رنگ مو) - 90 min, 1,200,000 Toman
 - **Eyebrow** (اصلاح ابرو) - 15 min, 200,000 Toman
 
-To modify services, update the database directly or use the admin commands (when implemented).
+Barbers can manage their services via the web panel at `/barber/services`.
 
 ### Working Hours | ساعات کاری
 
-Default working hours (Saturday-Thursday 10:00-21:00, Friday closed):
+Each barber has independent working hours. Default: Saturday-Thursday 10:00-21:00, Friday closed.
+
+Configure via web panel at `/barber/hours` or directly in the database:
+
 ```sql
+-- View working hours for a barber
+SELECT * FROM working_hours WHERE barber_id = 1;
+
 -- Saturday = 6, Sunday = 0, Monday = 1, ..., Friday = 5
--- Edit in database or via admin commands
-SELECT * FROM working_hours;
 ```
 
 ---
@@ -149,9 +199,22 @@ SELECT * FROM working_hours;
 barber-app/
 ├── src/
 │   ├── app/                    # Next.js app directory
+│   │   ├── admin/              # Super admin web panel
+│   │   │   ├── page.tsx        # Admin dashboard
+│   │   │   ├── barbers/        # Manage barbers
+│   │   │   ├── appointments/   # View all appointments
+│   │   │   ├── customers/      # View all customers
+│   │   │   └── settings/       # Salon settings
+│   │   ├── barber/             # Barber web panel
+│   │   │   ├── page.tsx        # Barber dashboard
+│   │   │   ├── calendar/       # Calendar view
+│   │   │   ├── services/       # Manage services
+│   │   │   ├── hours/          # Working hours
+│   │   │   └── customers/      # Customer list
+│   │   ├── login/              # Magic link login page
 │   │   ├── api/
 │   │   │   ├── webhooks/
-│   │   │   │   └── telegram/   # Telegram webhook endpoint
+│   │   │   │   └── telegram/   # Telegram webhook (RAW API)
 │   │   │   └── cron/
 │   │   │       └── reminders/  # Reminder cron job
 │   │   ├── layout.tsx
@@ -159,21 +222,83 @@ barber-app/
 │   ├── db/
 │   │   ├── client.ts           # Database client and types
 │   │   ├── schema.sql          # Database schema
-│   │   ├── migrate.ts          # Migration runner
+│   │   ├── migrate.ts          # Schema migration runner
+│   │   ├── migrate-data.ts     # Data migration (upgrade)
 │   │   └── seed.ts             # Seed data
-│   └── lib/
-│       ├── bot.ts              # Main bot logic
-│       ├── messages.ts         # Persian UI messages
-│       ├── state-adapter.ts    # PostgreSQL state adapter
-│       ├── slots.ts            # Slot calculation logic
-│       ├── jalali.ts           # Persian calendar utilities
-│       └── __tests__/          # Tests
+│   ├── lib/
+│   │   ├── auth.ts             # Magic links & sessions
+│   │   ├── messages.ts         # Persian UI messages
+│   │   ├── slots.ts            # Per-barber slot logic
+│   │   ├── jalali.ts           # Persian calendar
+│   │   └── __tests__/          # Tests
+│   └── middleware.ts           # Web auth & role gates
 ├── .env.example                # Environment variables template
 ├── vercel.json                 # Vercel configuration (cron)
-├── next.config.js
-├── tsconfig.json
 └── package.json
 ```
+
+---
+
+## 👥 User Flows
+
+### Customer Flow | جریان مشتری
+
+1. Customer sends `/start` to bot
+2. Taps "📅 رزرو نوبت جدید"
+3. **Selects barber** (if multiple barbers)
+4. Selects service
+5. Picks date from Jalali calendar
+6. Chooses available time slot
+7. Enters name and phone
+8. Confirms booking
+9. Barber receives notification with Confirm/Reject buttons
+10. Customer receives confirmation
+11. Gets automatic reminder ~24 hours before
+
+### Barber Flow | جریان آرایشگر
+
+**Via Telegram:**
+- Receive booking requests → Confirm/Reject
+- `/today` - View today's schedule
+- `/week` - View weekly schedule
+- `/panel` - Get web panel link
+
+**Via Web Panel:**
+- View week calendar with all appointments
+- Manage services (add, edit, disable)
+- Configure working hours
+- Block time slots for breaks/vacation
+- View customer list
+- Create manual bookings
+
+### Admin Flow | جریان ادمین
+
+1. Send `/panel` to bot
+2. Open magic link → lands at `/admin`
+3. View dashboard with stats
+4. Manage barbers (add/disable)
+5. View all appointments across barbers
+6. View all customers
+7. Configure salon settings
+
+---
+
+## 🔐 Authentication
+
+### Web Panel Access
+
+Both barbers and admins access web panels via **magic links**:
+
+1. User sends `/panel` (or taps "🔐 ورود به پنل مدیریت") to bot
+2. Bot generates a one-time magic link (expires in 10 minutes)
+3. User clicks link → logged in automatically
+4. Session stored in httpOnly cookie (7 days)
+
+**Security:**
+- Links are single-use and expire quickly
+- Sessions use SHA-256 hashed tokens
+- Role-based access control in middleware
+- No password storage or management needed
 
 ---
 
@@ -184,16 +309,12 @@ Run tests:
 npm test
 ```
 
-Run tests in watch mode:
-```bash
-npm run test:watch
-```
-
 Tests cover:
-- ✅ Slot overlap detection
-- ✅ Working hours validation
+- ✅ Per-barber slot overlap detection
+- ✅ Working hours validation per barber
 - ✅ Closed days (Friday)
 - ✅ Duration fitting
+- ✅ Multi-barber slot independence
 - ✅ Timezone handling (Asia/Tehran)
 - ✅ Jalali calendar conversion
 
@@ -213,56 +334,45 @@ git push origin main
 2. **Import to Vercel:**
    - Go to [vercel.com](https://vercel.com)
    - Import your repository
-   - Add environment variables in project settings
+   - Add environment variables
    - Deploy
 
 3. **Configure webhook:**
-   - After deployment, set the webhook URL using the command shown in Quick Start
-   - Use your Vercel deployment URL: `https://your-project.vercel.app/api/webhooks/telegram`
+```bash
+curl -X POST "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/setWebhook" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://your-project.vercel.app/api/webhooks/telegram",
+    "secret_token": "your_random_secret_here"
+  }'
+```
 
 ### Environment Variables Required
-
-Set these in Vercel dashboard (Settings → Environment Variables):
 
 | Variable | Description | Example |
 |----------|-------------|---------|
 | `TELEGRAM_BOT_TOKEN` | Bot token from @BotFather | `123456:ABCDEF...` |
-| `TELEGRAM_WEBHOOK_SECRET_TOKEN` | Random secret for webhook verification | `random_secret_string` |
-| `ADMIN_TELEGRAM_IDS` | Comma-separated admin user IDs | `123456789,987654321` |
-| `DATABASE_URL` | PostgreSQL connection string | `postgresql://...` |
+| `TELEGRAM_WEBHOOK_SECRET_TOKEN` | Random secret for webhook | `random_secret` |
+| `ADMIN_TELEGRAM_IDS` | Super admin Telegram IDs | `123456789` |
+| `DATABASE_URL` | PostgreSQL connection | `postgresql://...` |
+| `APP_URL` | Web application URL | `https://your-domain.com` |
 | `SALON_NAME` | Salon name (optional) | `سالن زیبایی` |
+
+**Important:** After deployment, run migrations and seed:
+```bash
+npm run db:migrate
+npm run db:seed
+```
 
 ### Automatic Reminders
 
-The reminder system behavior depends on your Vercel plan:
+**Vercel Hobby Plan (Current):**
+- Cron: Daily at `30 4 * * *` (04:30 UTC = 08:00 Asia/Tehran)
+- Sends 24-hour reminders for appointments 20-28 hours away
 
-#### Vercel Hobby Plan (Current)
-- **Cron Schedule:** Once daily at `30 4 * * *` (04:30 UTC = 08:00 Asia/Tehran)
-- **24-hour reminders:** Sent to appointments scheduled 20-28 hours from the daily run
-- **2-hour reminders:** Will rarely fire (only if an appointment happens to be exactly 2 hours away at 08:00)
-- **Limitation:** Vercel Hobby only supports daily cron jobs
-
-#### Vercel Pro Plan (Recommended for Full Features)
-- **Cron Schedule:** Every 30 minutes `*/30 * * * *`
-- **24-hour reminders:** Sent reliably 24 hours before confirmed appointments
-- **2-hour reminders:** Sent reliably 2 hours before confirmed appointments
-- **Idempotent:** Each reminder is sent only once
-
-To upgrade to Pro for full reminder features, change the `schedule` in `vercel.json` to `*/30 * * * *` and redeploy.
-
----
-
-## 📖 Customer Flow | جریان کاری مشتری
-
-1. **Start** - Customer sends `/start` to [@BarberAppointmentAppBot](https://t.me/BarberAppointmentAppBot)
-2. **Select Service** - Choose from haircut, beard trim, hair color, etc.
-3. **Pick Date** - Select from next 14 available days (Jalali calendar)
-4. **Choose Time** - Pick from available time slots
-5. **Enter Contact** - Provide name and phone number
-6. **Confirm** - Review and confirm booking
-7. **Wait for Admin** - Admin receives notification with Confirm/Reject buttons
-8. **Get Confirmation** - Customer receives confirmation message
-9. **Receive Reminder** - Automatic reminder ~24 hours before appointment (daily at 08:00 Asia/Tehran)
+**Vercel Pro Plan (Recommended):**
+- Cron: Every 30 minutes `*/30 * * * *`
+- Reliable 24-hour and 2-hour reminders
 
 ---
 
@@ -270,9 +380,14 @@ To upgrade to Pro for full reminder features, change the `schedule` in `vercel.j
 
 ### Database Migrations
 
-Apply schema changes:
+Apply schema:
 ```bash
 npm run db:migrate
+```
+
+Migrate existing data (when upgrading from single-barber):
+```bash
+npm run db:migrate:data
 ```
 
 Seed default data:
@@ -282,61 +397,108 @@ npm run db:seed
 
 ### Bot Development
 
-The bot uses a state machine pattern for the booking flow:
-1. **service** - Select service
-2. **date** - Pick date  
-3. **time** - Choose time slot
-4. **contact** - Collect name/phone
-5. **confirm** - Review and confirm
+The bot uses RAW Telegram Bot API (fetch to sendMessage) - **no Chat SDK** for inbound webhooks. Multi-barber booking flow:
 
-State is stored in PostgreSQL with 1-hour TTL.
+1. **barber** - Select barber (if multiple active)
+2. **service** - Select service for that barber
+3. **date** - Pick date (barber's open days)
+4. **time** - Choose time (barber's available slots)
+5. **contact** - Enter name/phone
+6. **confirm** - Review and confirm
 
-### Adding New Features
+State stored in PostgreSQL with 1-hour TTL.
 
-To add new services:
+### Adding Features
+
+To add a new barber:
 ```sql
-INSERT INTO services (name, duration_minutes, price_toman)
-VALUES ('خدمت جدید', 30, 200000);
-```
+-- Create user
+INSERT INTO users (telegram_id, role, name, is_active)
+VALUES (999888777, 'barber', 'New Barber', true);
 
-To block a time range:
-```sql
-INSERT INTO blocked_slots (start_time, end_time, reason)
-VALUES ('2024-01-10 14:00:00+03:30', '2024-01-10 16:00:00+03:30', 'تعطیلات');
+-- Create barber
+INSERT INTO barbers (user_id, display_name, is_active)
+SELECT id, 'New Barber', true FROM users WHERE telegram_id = 999888777;
+
+-- Add services and working hours...
 ```
 
 ---
 
 ## 🔐 Security Notes
 
-- **Never commit secrets** - Bot tokens, database URLs, and secrets are in `.env` (gitignored)
-- **Webhook verification** - All webhooks are verified with `TELEGRAM_WEBHOOK_SECRET_TOKEN`
-- **Admin access** - Only users in `ADMIN_TELEGRAM_IDS` can use admin commands
-- **Database security** - Use connection pooling and prepared statements (handled by Neon SDK)
+- **No secrets in code** - All tokens in `.env` (gitignored)
+- **Webhook verification** - Secret token validation
+- **Magic link auth** - Single-use, expiring tokens
+- **Role-based access** - Middleware enforces permissions
+- **httpOnly cookies** - Session tokens not accessible to JS
+- **Database security** - Prepared statements via Neon SDK
+
+---
+
+## 📖 API Documentation
+
+### Telegram Bot Commands
+
+**Everyone:**
+- `/start`, `/menu` - Show main menu
+- `/panel` - Get web panel link (barbers and admins only)
+
+**Barbers:**
+- `/today` - Today's appointments (for that barber)
+- `/week` - This week's appointments (for that barber)
+
+**Super Admin:**
+- `/today` - All appointments today (all barbers)
+- `/week` - All appointments this week (all barbers)
+
+### Web Routes
+
+**Public:**
+- `/login?token=...` - Magic link login
+
+**Barber (role: barber or super_admin):**
+- `/barber` - Dashboard
+- `/barber/calendar` - Week calendar
+- `/barber/services` - Manage services
+- `/barber/hours` - Working hours
+- `/barber/customers` - Customer list
+
+**Admin (role: super_admin only):**
+- `/admin` - Dashboard
+- `/admin/barbers` - Manage barbers
+- `/admin/appointments` - All appointments
+- `/admin/customers` - All customers
+- `/admin/settings` - Salon settings
 
 ---
 
 ## 🐛 Troubleshooting
 
 ### Bot not responding
-1. Check bot token is correct in `.env`
-2. Verify webhook is set correctly (production) or polling is enabled (development)
-3. Check Vercel logs for errors
+1. Check bot token in `.env`
+2. Verify webhook is set correctly
+3. Check Vercel function logs
+
+### Web panel not loading
+1. Verify `APP_URL` is set correctly
+2. Check magic link hasn't expired (10 min)
+3. Ensure user role is barber or super_admin
 
 ### Reminders not sending
-1. Verify cron job is enabled in Vercel dashboard
-2. Check `sent_reminders` table for duplicate prevention
+1. Verify cron job enabled in Vercel
+2. Check `sent_reminders` table
 3. Review `/api/cron/reminders` logs
 
-### Double-booking occurring
-1. Ensure slot validation runs before booking creation
-2. Check for race conditions (use database locks if needed)
-3. Verify `isSlotAvailable` function logic
+### Double-booking
+1. Should not happen with per-barber slots
+2. Check `isSlotAvailable` uses correct barber_id
+3. Verify database constraints
 
-### Timezone issues
-1. All dates are stored as `timestamptz` in PostgreSQL
-2. Application uses `Asia/Tehran` timezone consistently
-3. Jalali conversion happens only for display
+### Role issues
+1. Check users table: `SELECT * FROM users WHERE telegram_id = YOUR_ID;`
+2. Verify barbers table for barber users
+3. Check middleware logs
 
 ---
 
@@ -349,10 +511,10 @@ MIT
 ## 🙏 Acknowledgments
 
 Built with:
-- [Vercel Chat SDK](https://chat-sdk.dev) - Multi-platform bot framework
 - [Next.js](https://nextjs.org) - React framework
 - [Neon](https://neon.tech) - Serverless PostgreSQL
-- [jalaali-js](https://github.com/jalaali/jalaali-js) - Persian calendar conversion
+- [jalaali-js](https://github.com/jalaali/jalaali-js) - Persian calendar
+- [Telegram Bot API](https://core.telegram.org/bots/api) - Bot platform
 
 ---
 
@@ -360,10 +522,10 @@ Built with:
 
 For issues or questions:
 - Open an issue on GitHub
-- Contact the salon directly through the bot
-
-**Bot Username:** [@BarberAppointmentAppBot](https://t.me/BarberAppointmentAppBot)
+- Contact through the bot: [@BarberAppointmentAppBot](https://t.me/BarberAppointmentAppBot)
 
 ---
 
-Made with ❤️ for Iranian hairdressers and their customers
+**Made with ❤️ for Iranian hairdressers and their customers**
+
+**ساخته شده با ❤️ برای آرایشگران ایرانی و مشتریان آن‌ها**
