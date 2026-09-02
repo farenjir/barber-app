@@ -77,10 +77,8 @@ export function AppShell({ children, userName, userRole, barberName, pageTitle, 
               label="بازگشت به داشبورد ادمین"
               leftSection={<IconLayoutDashboard size={20} stroke={1.5} />}
               mb="md"
-              style={{ 
-                backgroundColor: 'var(--mantine-color-blue-light)',
-                borderRadius: '8px'
-              }}
+              variant="light"
+              color="blue"
             />
           )}
           {links.map((link) => (
