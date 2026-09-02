@@ -1,16 +1,17 @@
 'use client';
 
 import { useState } from 'react';
-import { Button, Select, TextInput, Paper, Stack, Group, Alert } from '@mantine/core';
+import { Button, Select, TextInput, Paper, Stack, Group, Alert, Code, CopyButton, ActionIcon, Tooltip } from '@mantine/core';
 import { DateTimePicker } from '@mantine/dates';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
-import { IconCalendar, IconCheck } from '@tabler/icons-react';
+import { IconCalendar, IconCheck, IconCopy, IconCheck as IconCopyCheck } from '@tabler/icons-react';
 import { createAppointment } from './actions';
 import dayjs from 'dayjs';
 import 'dayjs/locale/fa';
 import timezone from 'dayjs/plugin/timezone';
 import utc from 'dayjs/plugin/utc';
+import { toJalaali } from 'jalaali-js';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -26,16 +27,28 @@ interface Service {
 interface BookClientProps {
   barberId: number;
   services: Service[];
+  userRole: 'barber' | 'super_admin';
 }
 
-export default function BookClient({ barberId, services }: BookClientProps) {
+const PERSIAN_MONTHS = [
+  'فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور',
+  'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'
+];
+
+const toPersianNumber = (num: number): string => {
+  const persianDigits = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
+  return num.toString().split('').map(digit => persianDigits[parseInt(digit)] || digit).join('');
+};
+
+export default function BookClient({ barberId, services, userRole }: BookClientProps) {
   const [success, setSuccess] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<{ message: string; stack?: string } | null>(null);
 
   const form = useForm({
     initialValues: {
       serviceId: '',
-      datetime: null as Date | null,
+      datetime: null as string | null,
       name: '',
       phone: '',
     },
@@ -51,14 +64,25 @@ export default function BookClient({ barberId, services }: BookClientProps) {
     if (!values.datetime) return;
     
     setSubmitting(true);
+    setError(null);
     try {
-      await createAppointment(
+      const result = await createAppointment(
         barberId,
         parseInt(values.serviceId),
-        values.datetime.toISOString(),
+        values.datetime,
         values.name,
         values.phone
       );
+      
+      if (!result.ok) {
+        setError({ message: result.error, stack: result.stack });
+        notifications.show({
+          title: 'خطا',
+          message: result.error,
+          color: 'red',
+        });
+        return;
+      }
       
       setSuccess(true);
       form.reset();
@@ -70,15 +94,28 @@ export default function BookClient({ barberId, services }: BookClientProps) {
       });
       
       setTimeout(() => setSuccess(false), 3000);
-    } catch (error) {
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'مشکلی پیش آمد';
+      setError({ message });
       notifications.show({
         title: 'خطا',
-        message: 'مشکلی پیش آمد',
+        message,
         color: 'red',
       });
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const formatJalaliLabel = (date: Date | null): string => {
+    if (!date) return '';
+    const jDate = toJalaali(date.getFullYear(), date.getMonth() + 1, date.getDate());
+    const monthName = PERSIAN_MONTHS[jDate.jm - 1];
+    const day = toPersianNumber(jDate.jd);
+    const year = toPersianNumber(jDate.jy);
+    const hour = toPersianNumber(date.getHours());
+    const minute = toPersianNumber(date.getMinutes());
+    return `${day} ${monthName} ${year} - ${hour.padStart(2, '۰')}:${minute.padStart(2, '۰')}`;
   };
 
   const serviceOptions = services.map(s => ({
@@ -94,6 +131,31 @@ export default function BookClient({ barberId, services }: BookClientProps) {
         </Alert>
       )}
 
+      {error && (
+        <Alert title="خطا" color="red" mb="md">
+          <div>{error.message}</div>
+          {error.stack && userRole === 'super_admin' && (
+            <div style={{ marginTop: '8px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                <small>Stack trace:</small>
+                <CopyButton value={error.stack}>
+                  {({ copied, copy }) => (
+                    <Tooltip label={copied ? 'کپی شد' : 'کپی'}>
+                      <ActionIcon size="sm" color={copied ? 'teal' : 'gray'} onClick={copy}>
+                        {copied ? <IconCopyCheck size={14} /> : <IconCopy size={14} />}
+                      </ActionIcon>
+                    </Tooltip>
+                  )}
+                </CopyButton>
+              </div>
+              <Code block style={{ fontSize: '11px', maxHeight: '150px', overflow: 'auto' }}>
+                {error.stack}
+              </Code>
+            </div>
+          )}
+        </Alert>
+      )}
+
       <form onSubmit={form.onSubmit(handleSubmit)}>
         <Stack>
           <Select
@@ -101,6 +163,7 @@ export default function BookClient({ barberId, services }: BookClientProps) {
             placeholder="انتخاب کنید"
             data={serviceOptions}
             required
+            clearable
             {...form.getInputProps('serviceId')}
           />
 
@@ -109,6 +172,7 @@ export default function BookClient({ barberId, services }: BookClientProps) {
             placeholder="انتخاب کنید"
             minDate={new Date()}
             locale="fa"
+            valueFormat="YYYY-MM-DD HH:mm:ss"
             required
             {...form.getInputProps('datetime')}
           />

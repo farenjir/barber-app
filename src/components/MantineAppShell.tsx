@@ -6,7 +6,7 @@ import { useDisclosure } from '@mantine/hooks';
 import { usePathname } from 'next/navigation';
 import { 
   IconLogout, IconLayoutDashboard, IconCalendar, IconScissors, 
-  IconClock, IconUserPlus, IconUsers, IconSettings 
+  IconClock, IconUserPlus, IconUsers, IconSettings, IconAlertTriangle 
 } from '@tabler/icons-react';
 import Link from 'next/link';
 
@@ -32,6 +32,7 @@ const adminLinks = [
   { href: '/admin/barbers', label: 'آرایشگرها', icon: IconUsers },
   { href: '/admin/appointments', label: 'نوبت‌ها', icon: IconCalendar },
   { href: '/admin/customers', label: 'مشتریان', icon: IconUsers },
+  { href: '/admin/errors', label: 'خطاها', icon: IconAlertTriangle },
   { href: '/admin/settings', label: 'تنظیمات', icon: IconSettings },
 ];
 

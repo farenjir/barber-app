@@ -28,7 +28,7 @@ export default async function BarberBook() {
       barberName={barber[0].display_name}
       pageTitle="نوبت دستی"
     >
-      <BookClient barberId={barberId} services={services} />
+      <BookClient barberId={barberId} services={services} userRole={user.role as 'barber' | 'super_admin'} />
     </AppShell>
   );
 }

@@ -37,6 +37,16 @@ CREATE TABLE IF NOT EXISTS sessions (
   created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS error_logs (
+  id SERIAL PRIMARY KEY,
+  created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+  source TEXT NOT NULL,
+  path TEXT NOT NULL,
+  message TEXT NOT NULL,
+  stack TEXT,
+  user_id INTEGER REFERENCES users(id) ON DELETE SET NULL
+);
+
 -- Step 2: Add barber_id to existing tables (if not already present)
 -- Services
 ALTER TABLE services ADD COLUMN IF NOT EXISTS barber_id INTEGER;
