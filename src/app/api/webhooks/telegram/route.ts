@@ -195,7 +195,7 @@ async function handlePanelCommand(chatId: number, userId: number, request?: Requ
 
   try {
     const token = await createMagicLink(user.id);
-    const magicLink = `${appUrl}/login?token=${token}`;
+    const magicLink = `${appUrl}/api/auth/magic?token=${token}`;
     
     await sendMessage(
       chatId,
@@ -281,7 +281,7 @@ async function completeBarberRegistration(chatId: number, userId: number, displa
     // Send magic link to panel
     const appUrl = getAppUrl(request);
     const token = await createMagicLink(userDbId);
-    const magicLink = `${appUrl}/login?token=${token}`;
+    const magicLink = `${appUrl}/api/auth/magic?token=${token}`;
     
     await sendMessage(chatId, MESSAGES.barberRegistration.success(magicLink));
   } catch (error) {
