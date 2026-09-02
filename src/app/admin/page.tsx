@@ -1,4 +1,4 @@
-import { headers } from 'next/headers';
+import { requireAdmin } from '@/lib/auth-server';
 import { sql } from '@/db/client';
 import Link from 'next/link';
 
@@ -43,8 +43,7 @@ async function getAdminStats() {
 }
 
 export default async function AdminDashboard() {
-  const headersList = await headers();
-  const userName = headersList.get('x-user-name') || '';
+  const user = await requireAdmin();
 
   const stats = await getAdminStats();
 
@@ -58,7 +57,7 @@ export default async function AdminDashboard() {
             <p className="text-sm text-gray-600">سوپر ادمین</p>
           </div>
           <div className="text-left">
-            <p className="text-sm text-gray-600">{userName}</p>
+            <p className="text-sm text-gray-600">{user.name}</p>
           </div>
         </div>
       </header>

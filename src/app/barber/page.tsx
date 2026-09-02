@@ -1,7 +1,7 @@
-import { headers } from 'next/headers';
-import { redirect } from 'next/navigation';
+import { requireBarber } from '@/lib/auth-server';
 import { sql } from '@/db/client';
 import Link from 'next/link';
+import { getTehranDayStart, getTehranNextDayStart, addTehranDays } from '@/lib/tehran-time';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,10 +19,8 @@ async function getBarberData(userId: number) {
 
   // Get today's appointments
   const now = new Date();
-  const today = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Tehran' }));
-  today.setHours(0, 0, 0, 0);
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
+  const today = getTehranDayStart(now);
+  const tomorrow = getTehranNextDayStart(now);
 
   const todayAppointments = await sql`
     SELECT a.*, s.name as service_name
@@ -42,8 +40,7 @@ async function getBarberData(userId: number) {
   ` as any[];
 
   // Get upcoming appointments count (next 7 days)
-  const nextWeek = new Date(today);
-  nextWeek.setDate(nextWeek.getDate() + 7);
+  const nextWeek = addTehranDays(today, 7);
 
   const upcomingCount = await sql`
     SELECT COUNT(*) as count FROM appointments 
@@ -62,11 +59,9 @@ async function getBarberData(userId: number) {
 }
 
 export default async function BarberDashboard() {
-  const headersList = await headers();
-  const userId = parseInt(headersList.get('x-user-id') || '0');
-  const userName = headersList.get('x-user-name') || '';
+  const user = await requireBarber();
 
-  const data = await getBarberData(userId);
+  const data = await getBarberData(user.id);
 
   if (!data) {
     return (
@@ -91,7 +86,7 @@ export default async function BarberDashboard() {
             <p className="text-sm text-gray-600">پنل آرایشگر</p>
           </div>
           <div className="text-left">
-            <p className="text-sm text-gray-600">{userName}</p>
+            <p className="text-sm text-gray-600">{user.name}</p>
           </div>
         </div>
       </header>

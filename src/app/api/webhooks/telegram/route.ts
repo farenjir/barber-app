@@ -4,12 +4,34 @@ import { MESSAGES } from '@/lib/messages';
 import { formatFullJalaliDate, formatTime } from '@/lib/jalali';
 import { getNextOpenDays, getAvailableSlots, isSlotAvailable } from '@/lib/slots';
 import { createMagicLink, getUserByTelegramId, getActiveBarbers } from '@/lib/auth';
+import { getTehranDayStart, getTehranNextDayStart, addTehranDays } from '@/lib/tehran-time';
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN!;
 const WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET_TOKEN!;
 const TELEGRAM_API = `https://api.telegram.org/bot${BOT_TOKEN}`;
 const SALON_NAME = process.env.SALON_NAME || 'سالن زیبایی';
-const APP_URL = process.env.APP_URL || process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '';
+
+// Get app URL with proper fallbacks
+function getAppUrl(request?: Request): string {
+  // 1. Use APP_URL if set
+  if (process.env.APP_URL) {
+    return process.env.APP_URL;
+  }
+  
+  // 2. Use VERCEL_URL if available
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
+  
+  // 3. Extract from request if provided
+  if (request) {
+    const url = new URL(request.url);
+    return `${url.protocol}//${url.host}`;
+  }
+  
+  // 4. Fallback
+  return 'http://localhost:3000';
+}
 
 // Telegram API types
 interface TelegramUpdate {
@@ -156,7 +178,7 @@ async function handleStart(chatId: number, userId: number): Promise<void> {
 }
 
 // Handle /panel command
-async function handlePanelCommand(chatId: number, userId: number): Promise<void> {
+async function handlePanelCommand(chatId: number, userId: number, request?: Request): Promise<void> {
   const user = await getUserByTelegramId(userId);
   
   if (!user || (user.role !== 'barber' && user.role !== 'super_admin')) {
@@ -164,14 +186,16 @@ async function handlePanelCommand(chatId: number, userId: number): Promise<void>
     return;
   }
 
-  if (!APP_URL) {
+  const appUrl = getAppUrl(request);
+  
+  if (!appUrl || appUrl === 'http://localhost:3000') {
     await sendMessage(chatId, 'پنل مدیریت در حال حاضر در دسترس نیست. لطفاً با پشتیبانی تماس بگیرید.');
     return;
   }
 
   try {
     const token = await createMagicLink(user.id);
-    const magicLink = `${APP_URL}/login?token=${token}`;
+    const magicLink = `${appUrl}/login?token=${token}`;
     
     await sendMessage(
       chatId,
@@ -334,7 +358,7 @@ async function handleTimeSelected(
 }
 
 // Handle text input (name/phone)
-async function handleText(chatId: number, userId: number, text: string): Promise<void> {
+async function handleText(chatId: number, userId: number, text: string, request?: Request): Promise<void> {
   const state = await getUserState(userId);
 
   // Check for menu buttons
@@ -359,7 +383,7 @@ async function handleText(chatId: number, userId: number, text: string): Promise
     return;
   }
   if (text === '🔐 ورود به پنل مدیریت' || text === '/panel') {
-    await handlePanelCommand(chatId, userId);
+    await handlePanelCommand(chatId, userId, request);
     return;
   }
 
@@ -653,11 +677,8 @@ async function handleServices(chatId: number): Promise<void> {
 // Barber/Admin: today's appointments
 async function handleTodayCommand(chatId: number, userId: number, user: any): Promise<void> {
   const now = new Date();
-  const today = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Tehran' }));
-  today.setHours(0, 0, 0, 0);
-
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
+  const today = getTehranDayStart(now);
+  const tomorrow = getTehranNextDayStart(now);
 
   let query;
   if (user.role === 'barber') {
@@ -717,11 +738,8 @@ async function handleTodayCommand(chatId: number, userId: number, user: any): Pr
 // Barber/Admin: week's appointments
 async function handleWeekCommand(chatId: number, userId: number, user: any): Promise<void> {
   const now = new Date();
-  const today = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Tehran' }));
-  today.setHours(0, 0, 0, 0);
-
-  const nextWeek = new Date(today);
-  nextWeek.setDate(nextWeek.getDate() + 7);
+  const today = getTehranDayStart(now);
+  const nextWeek = addTehranDays(today, 7);
 
   let query;
   if (user.role === 'barber') {
@@ -811,7 +829,7 @@ export async function POST(request: Request): Promise<Response> {
       if (text === '/start' || text === '/menu') {
         await handleStart(chatId, userId);
       } else {
-        await handleText(chatId, userId, text);
+        await handleText(chatId, userId, text, request);
       }
     }
 
