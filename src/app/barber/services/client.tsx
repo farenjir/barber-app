@@ -1,10 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { Button, Modal, TextInput, NumberInput, Table, Badge, Group, Stack, ActionIcon } from '@mantine/core';
+import { Button, Modal, TextInput, NumberInput, Table, Badge, Group, Stack, ActionIcon, Switch } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
-import { IconPlus, IconEdit, IconCheck, IconX } from '@tabler/icons-react';
+import { IconPlus, IconEdit } from '@tabler/icons-react';
 import { createService, updateService, toggleService } from './actions';
 
 interface Service {
@@ -78,10 +78,11 @@ export default function ServicesClient({ barberId, initialServices }: ServicesCl
       }
       setOpened(false);
       form.reset();
-    } catch (error) {
+    } catch (error: any) {
+      const errorMessage = error?.message || 'خطا در انجام عملیات. لطفاً دوباره تلاش کنید.';
       notifications.show({
         title: 'خطا',
-        message: 'مشکلی پیش آمد',
+        message: errorMessage,
         color: 'red',
       });
     }
@@ -97,13 +98,14 @@ export default function ServicesClient({ barberId, initialServices }: ServicesCl
       ));
       notifications.show({
         title: 'موفق',
-        message: `خدمت ${!service.is_active ? 'فعال' : 'غیرفعال'} شد`,
+        message: `خدمت ${!service.is_active ? 'فعال' : 'غیرفعال موقت'} شد`,
         color: 'blue',
       });
-    } catch (error) {
+    } catch (error: any) {
+      const errorMessage = error?.message || 'خطا در تغییر وضعیت خدمت. لطفاً دوباره تلاش کنید.';
       notifications.show({
         title: 'خطا',
-        message: 'مشکلی پیش آمد',
+        message: errorMessage,
         color: 'red',
       });
     }
@@ -136,32 +138,33 @@ export default function ServicesClient({ barberId, initialServices }: ServicesCl
           </Table.Thead>
           <Table.Tbody>
             {services.map((service) => (
-              <Table.Tr key={service.id}>
-                <Table.Td>{service.name}</Table.Td>
+              <Table.Tr key={service.id} style={{ opacity: service.is_active ? 1 : 0.6 }}>
+                <Table.Td>
+                  <Group gap="xs">
+                    {service.name}
+                    {!service.is_active && (
+                      <Badge color="gray" size="sm">غیرفعال</Badge>
+                    )}
+                  </Group>
+                </Table.Td>
                 <Table.Td>{service.duration_minutes} دقیقه</Table.Td>
                 <Table.Td>{service.price_toman.toLocaleString('fa-IR')} تومان</Table.Td>
                 <Table.Td>
-                  <Badge color={service.is_active ? 'green' : 'gray'}>
-                    {service.is_active ? 'فعال' : 'غیرفعال'}
-                  </Badge>
+                  <Switch
+                    checked={service.is_active}
+                    onChange={() => handleToggle(service)}
+                    label={service.is_active ? 'فعال' : 'غیرفعال موقت'}
+                    color="green"
+                  />
                 </Table.Td>
                 <Table.Td>
-                  <Group gap="xs">
-                    <ActionIcon
-                      variant="subtle"
-                      color="blue"
-                      onClick={() => handleOpenModal(service)}
-                    >
-                      <IconEdit size={16} />
-                    </ActionIcon>
-                    <ActionIcon
-                      variant="subtle"
-                      color={service.is_active ? 'red' : 'green'}
-                      onClick={() => handleToggle(service)}
-                    >
-                      {service.is_active ? <IconX size={16} /> : <IconCheck size={16} />}
-                    </ActionIcon>
-                  </Group>
+                  <ActionIcon
+                    variant="subtle"
+                    color="blue"
+                    onClick={() => handleOpenModal(service)}
+                  >
+                    <IconEdit size={16} />
+                  </ActionIcon>
                 </Table.Td>
               </Table.Tr>
             ))}
