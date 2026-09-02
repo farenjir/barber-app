@@ -206,14 +206,18 @@ export async function getBarberByUserId(userId: number) {
 }
 
 /**
- * Get all active barbers
+ * Get all active barbers with at least one active service
  */
 export async function getActiveBarbers() {
   return await sql`
-    SELECT b.*, u.name as user_name, u.telegram_id
+    SELECT DISTINCT b.*, u.name as user_name, u.telegram_id
     FROM barbers b
     JOIN users u ON b.user_id = u.id
     WHERE b.is_active = true AND u.is_active = true
+    AND EXISTS (
+      SELECT 1 FROM services s 
+      WHERE s.barber_id = b.id AND s.is_active = true
+    )
     ORDER BY b.display_name
   ` as any[];
 }

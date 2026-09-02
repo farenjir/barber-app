@@ -185,7 +185,7 @@ export default async function BarberServices({
           </div>
           
           {services.length === 0 ? (
-            <p className="text-gray-600 text-center py-8">خدمتی یافت نشد</p>
+            <p className="text-gray-600 text-center py-8">هنوز خدمتی اضافه نکرده‌اید</p>
           ) : (
             <div className="space-y-3">
               {services.map((service: any) => (

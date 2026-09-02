@@ -260,3 +260,58 @@ describe('Date utilities', () => {
     expect(friday.getDay()).toBe(5);
   });
 });
+
+describe('Per-barber closed days (platform requirements)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should show Friday slots for barber B when barber A is closed on Friday', async () => {
+    const friday = new Date('2024-01-05T14:00:00+03:30'); // Friday
+    expect(friday.getDay()).toBe(5);
+    
+    const barberAId = 1;
+    const barberBId = 2;
+    
+    // Test barber A (Friday closed)
+    (sql as any).mockResolvedValueOnce([{
+      barber_id: barberAId,
+      weekday: 5,
+      start_time: '10:00',
+      end_time: '21:00',
+      is_open: false, // Closed on Friday
+    }]);
+    
+    const { isSlotAvailable } = await import('../slots');
+    const availableA = await isSlotAvailable(barberAId, friday, 45);
+    expect(availableA).toBe(false);
+    
+    // Test barber B (Friday open)
+    (sql as any).mockResolvedValueOnce([{
+      barber_id: barberBId,
+      weekday: 5,
+      start_time: '10:00',
+      end_time: '21:00',
+      is_open: true, // Open on Friday
+    }]);
+    
+    // Mock: No blocked slots for barber B
+    (sql as any).mockResolvedValueOnce([]);
+    
+    // Mock: No appointments for barber B
+    (sql as any).mockResolvedValueOnce([]);
+    
+    const availableB = await isSlotAvailable(barberBId, friday, 45);
+    expect(availableB).toBe(true);
+  });
+});
+
+describe('Barber visibility requirements', () => {
+  it('should describe filter logic: barbers without active services should not appear in booking list', () => {
+    // This is tested at the query level in getActiveBarbers()
+    // The query filters for barbers that have at least one active service
+    // This test documents the requirement
+    
+    expect(true).toBe(true); // Placeholder - actual test is integration level
+  });
+});

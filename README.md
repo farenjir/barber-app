@@ -1,14 +1,28 @@
 # 🪒 Barber Appointment Bot | ربات رزرو نوبت آرایشگاه
 
-A production-ready Telegram booking bot for hairdressers/barbers and their customers, built with Next.js and PostgreSQL. Supports multiple barbers with separate schedules and services.
+A production-ready Telegram booking platform for independent barbers and their customers, built with Next.js and PostgreSQL. Barbers can self-register and manage their own schedules and services.
 
-یک ربات تلگرام آماده برای رزرو نوبت آرایشگاه، ساخته شده با Next.js و PostgreSQL. پشتیبانی از چند آرایشگر با برنامه‌های کاری و خدمات جداگانه.
+یک پلتفرم تلگرام آماده برای رزرو نوبت آرایشگران مستقل، ساخته شده با Next.js و PostgreSQL. آرایشگران می‌توانند خودشان ثبت‌نام کنند و برنامه‌های کاری و خدمات خود را مدیریت کنند.
 
 **Live Bot:** [@BarberAppointmentAppBot](https://t.me/BarberAppointmentAppBot)
 
 ---
 
 ## 📋 Features | ویژگی‌ها
+
+### Platform for Independent Barbers | پلتفرم برای آرایشگران مستقل
+
+This is a **PLATFORM** for independent barbers, not a single salon. Each barber:
+- Self-registers through Telegram (open signup, no approval needed)
+- Has their own closed days and working hours (no global Friday off)
+- Sets their own services and prices
+- Appears in the customer booking list only when they have at least one active service
+
+این یک **پلتفرم** برای آرایشگران مستقل است، نه یک سالن واحد. هر آرایشگر:
+- از طریق تلگرام خودش ثبت‌نام می‌کند (ثبت‌نام باز، بدون نیاز به تأیید)
+- روزهای تعطیل و ساعات کاری خودش را دارد (جمعه به صورت سراسری تعطیل نیست)
+- خدمات و قیمت‌های خودش را تعیین می‌کند
+- فقط زمانی در لیست رزرو مشتریان نمایش داده می‌شود که حداقل یک خدمت فعال داشته باشد
 
 ### Three-Role System | سیستم سه نقشی
 
@@ -24,6 +38,7 @@ The system supports three distinct roles with different interfaces:
 
 #### 💈 Barber | آرایشگر
 - **Telegram bot + web panel**
+- **Self-registration:** Use "✍️ ثبت‌نام آرایشگر" button or `/register_barber` command
 - **Telegram features:**
   - ✅ **Confirm/Reject** - Review and respond to booking requests
   - 📊 `/today` - See today's appointments
@@ -32,25 +47,29 @@ The system supports three distinct roles with different interfaces:
 - **Web panel (`/barber`):**
   - 📅 **Calendar view** - Week view with Jalali dates
   - 💇 **Services CRUD** - Create, edit, disable services
-  - 🕐 **Working hours** - Configure opening hours per weekday
+  - 🕐 **Working hours** - Configure opening hours per weekday (per-barber closed days)
   - 🚫 **Block slots** - Block specific time ranges
   - 👥 **Customer list** - View customers from appointments
   - ➕ **Manual booking** - Create appointments manually
+- **Visibility:** Barbers appear in customer booking list only after adding at least one active service
 
 #### 👨‍💼 Super Admin | سوپر ادمین
 - **Web only (`/admin`)**
-- 👨‍💼 **Manage barbers** - Add/disable barbers by Telegram ID
+- 👨‍💼 **Manage barbers** - Add/disable barbers (optional - barbers can self-register via Telegram)
 - 📊 **View all appointments** - Filter by barber, date, status
 - 👥 **View all customers** - Complete customer database
 - ⚙️ **Salon settings** - Configure salon name and settings
 - 📈 **Dashboard** - Overview of all salon activity
 - **Telegram:** `/panel` command only (for web access link)
+- **Note:** Super admin can also be a barber (one Telegram user = one role, but super_admin can have a barbers record)
 
 ### Technical Features | ویژگی‌های فنی
 - 🌐 **Persian UI** - All user-facing text in Farsi (bot + web)
 - 📅 **Jalali Calendar** - Persian calendar for date display
 - 🕐 **Timezone** - Asia/Tehran timezone handling
 - 🔒 **Per-Barber Slots** - No overlap between barbers
+- 📝 **Open Self-Registration** - Barbers can register through Telegram bot
+- 🗓️ **Per-Barber Closed Days** - Each barber sets their own closed days (no global Friday off)
 - 🔐 **Magic Link Auth** - Secure web panel access via Telegram
 - 💾 **Durable State** - PostgreSQL-backed conversation state
 - 🔄 **Idempotent Reminders** - Prevents duplicate messages
@@ -111,9 +130,9 @@ npm run db:seed
 
 This will:
 - Create all database tables
-- Create a super admin user from `ADMIN_TELEGRAM_IDS`
-- Create a default barber with sample services
-- Set up default working hours
+- Create a super admin user from `ADMIN_TELEGRAM_IDS` (who is also the first barber)
+- Create default services for the first barber
+- Set up default working hours (all 7 days open, 10:00-21:00)
 
 4. **Start development server:**
 ```bash
@@ -146,11 +165,19 @@ curl -X POST "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/setWebhook" \
    - Send `/start`
    - Copy your numeric user ID
 2. Add it to `ADMIN_TELEGRAM_IDS` in `.env` (comma-separated for multiple admins)
-3. After running migrations and seed, this user will be a super admin
+3. After running migrations and seed, this user will be a super admin AND the first barber (same telegram_id)
 
-#### Adding Barbers
+#### Barber Self-Registration
 
-**Via Web Panel (Super Admin):**
+**Via Telegram Bot (Recommended):**
+1. Open the bot in Telegram
+2. Tap "✍️ ثبت‌نام آرایشگر" or send `/register_barber`
+3. Enter your display name
+4. Receive magic link to web panel
+5. Add your services and configure working hours
+6. You'll appear in customer booking list after adding at least one active service
+
+**Via Web Panel (Admin):**
 1. Super admin sends `/panel` to the bot
 2. Opens the magic link
 3. Navigates to `/admin/barbers`
@@ -180,7 +207,9 @@ Barbers can manage their services via the web panel at `/barber/services`.
 
 ### Working Hours | ساعات کاری
 
-Each barber has independent working hours. Default: Saturday-Thursday 10:00-21:00, Friday closed.
+Each barber has **independent working hours**. There is no global closed day (like Friday). Default for new barbers: all 7 days open, 10:00-21:00.
+
+**Important:** Each barber sets their own closed days through the web panel at `/barber/hours`. One barber can be closed on Friday while another is open.
 
 Configure via web panel at `/barber/hours` or directly in the database:
 
@@ -245,17 +274,35 @@ barber-app/
 
 1. Customer sends `/start` to bot
 2. Taps "📅 رزرو نوبت جدید"
-3. **Selects barber** (if multiple barbers)
-4. Selects service
-5. Picks date from Jalali calendar
-6. Chooses available time slot
+3. **Selects barber** (only barbers with at least one active service are shown)
+4. Selects service (only that barber's services)
+5. Picks date from Jalali calendar (only barber's open days are shown)
+6. Chooses available time slot (based on barber's working hours)
 7. Enters name and phone
 8. Confirms booking
 9. Barber receives notification with Confirm/Reject buttons
 10. Customer receives confirmation
 11. Gets automatic reminder ~24 hours before
 
+### Barber Registration Flow | جریان ثبت‌نام آرایشگر
+
+1. New barber opens bot
+2. Taps "✍️ ثبت‌نام آرایشگر" or sends `/register_barber`
+3. If already registered as barber/admin: told to use `/panel`
+4. Enters display name
+5. System creates/updates user record (role=barber)
+6. Creates barber record (is_active=true)
+7. Seeds working hours (all 7 days, 10:00-21:00, all open)
+8. Receives magic link to web panel
+9. Adds services (required before appearing in booking list)
+10. Configures closed days if needed
+
 ### Barber Flow | جریان آرایشگر
+
+**Registration:**
+- Tap "✍️ ثبت‌نام آرایشگر" or `/register_barber` in bot
+- Enter display name
+- Receive magic link to web panel
 
 **Via Telegram:**
 - Receive booking requests → Confirm/Reject
@@ -265,8 +312,8 @@ barber-app/
 
 **Via Web Panel:**
 - View week calendar with all appointments
-- Manage services (add, edit, disable)
-- Configure working hours
+- Manage services (add, edit, disable) - **required to appear in booking list**
+- Configure working hours and closed days (per-barber, not global)
 - Block time slots for breaks/vacation
 - View customer list
 - Create manual bookings
@@ -443,6 +490,7 @@ SELECT id, 'New Barber', true FROM users WHERE telegram_id = 999888777;
 **Everyone:**
 - `/start`, `/menu` - Show main menu
 - `/panel` - Get web panel link (barbers and admins only)
+- `/register_barber` - Register as a barber (new users or customers upgrading)
 
 **Barbers:**
 - `/today` - Today's appointments (for that barber)

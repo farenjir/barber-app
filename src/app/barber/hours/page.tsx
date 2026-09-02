@@ -88,7 +88,11 @@ export default async function BarberHours({
         )}
         
         <form action={updateHoursAction} className="bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-xl font-bold mb-6">تنظیم ساعات کاری</h2>
+          <h2 className="text-xl font-bold mb-4">تنظیم ساعات کاری</h2>
+          
+          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded text-sm text-blue-800">
+            <strong>توجه:</strong> این پلتفرم برای آرایشگران مستقل است. هر آرایشگر روز تعطیل و ساعات کاری خودش را مشخص می‌کند. برای مثال، یک آرایشگر می‌تواند جمعه‌ها تعطیل باشد و دیگری باز.
+          </div>
           
           <div className="space-y-4">
             {WEEKDAYS.map((day) => {

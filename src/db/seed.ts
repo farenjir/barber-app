@@ -12,42 +12,35 @@ async function seed() {
     
     const salonName = process.env.SALON_NAME || 'سالن زیبایی';
     
-    // Create super admin user (if ADMIN_TELEGRAM_IDS is set)
-    let adminUserId: number | null = null;
-    if (adminIds.length > 0) {
-      const firstAdminId = adminIds[0];
-      console.log(`Creating super admin user with telegram_id: ${firstAdminId}`);
-      
-      const [adminUser] = await sql`
-        INSERT INTO users (telegram_id, role, name, is_active)
-        VALUES (${firstAdminId}, 'super_admin', ${`مدیر ${salonName}`}, true)
-        ON CONFLICT (telegram_id) DO UPDATE SET role = 'super_admin', name = EXCLUDED.name
-        RETURNING id
-      ` as any[];
-      adminUserId = adminUser.id;
-      console.log('✓ Super admin user seeded');
+    if (adminIds.length === 0) {
+      console.log('⚠️ No ADMIN_TELEGRAM_IDS set, skipping admin/barber creation');
+      console.log('✓ Database seeding completed (no data seeded)');
+      return;
     }
-
-    // Create a default barber
-    const barberTelegramId = adminIds.length > 0 ? adminIds[0] + 1 : 888888888;
-    const [barberUser] = await sql`
+    
+    // Create super admin user who is ALSO the first barber (same telegram_id)
+    const firstAdminId = adminIds[0];
+    console.log(`Creating super admin user with telegram_id: ${firstAdminId}`);
+    
+    const [adminUser] = await sql`
       INSERT INTO users (telegram_id, role, name, is_active)
-      VALUES (${barberTelegramId}, 'barber', ${salonName}, true)
-      ON CONFLICT (telegram_id) DO UPDATE SET name = EXCLUDED.name
+      VALUES (${firstAdminId}, 'super_admin', ${`مدیر ${salonName}`}, true)
+      ON CONFLICT (telegram_id) DO UPDATE SET role = 'super_admin', name = EXCLUDED.name
       RETURNING id
     ` as any[];
-    console.log('✓ Default barber user seeded');
+    console.log('✓ Super admin user seeded');
 
+    // Create barber record for the super admin (platform owner is also a barber)
     const [barber] = await sql`
       INSERT INTO barbers (user_id, display_name, is_active)
-      VALUES (${barberUser.id}, ${salonName}, true)
+      VALUES (${adminUser.id}, ${salonName}, true)
       ON CONFLICT (user_id) DO UPDATE SET display_name = EXCLUDED.display_name
       RETURNING id
     ` as any[];
     const barberId = barber.id;
-    console.log('✓ Barber record seeded');
+    console.log('✓ First barber record seeded (same user as super admin)');
 
-    // Seed services for the default barber
+    // Seed services for the first barber
     const services = [
       { name: 'اصلاح مو', duration_minutes: 45, price_toman: 350000 },
       { name: 'اصلاح ریش', duration_minutes: 20, price_toman: 150000 },
@@ -64,7 +57,7 @@ async function seed() {
     }
     console.log('✓ Services seeded');
 
-    // Seed working hours for the default barber
+    // Seed working hours for the first barber - ALL 7 DAYS OPEN (10:00-21:00)
     // Saturday=6, Sunday=0, Monday=1, Tuesday=2, Wednesday=3, Thursday=4, Friday=5
     const workingHours = [
       { weekday: 0, start_time: '10:00', end_time: '21:00', is_open: true },  // Sunday
@@ -72,7 +65,7 @@ async function seed() {
       { weekday: 2, start_time: '10:00', end_time: '21:00', is_open: true },  // Tuesday
       { weekday: 3, start_time: '10:00', end_time: '21:00', is_open: true },  // Wednesday
       { weekday: 4, start_time: '10:00', end_time: '21:00', is_open: true },  // Thursday
-      { weekday: 5, start_time: '10:00', end_time: '21:00', is_open: false }, // Friday (closed)
+      { weekday: 5, start_time: '10:00', end_time: '21:00', is_open: true },  // Friday
       { weekday: 6, start_time: '10:00', end_time: '21:00', is_open: true },  // Saturday
     ];
 
@@ -83,7 +76,7 @@ async function seed() {
         ON CONFLICT (barber_id, weekday) DO NOTHING
       `;
     }
-    console.log('✓ Working hours seeded');
+    console.log('✓ Working hours seeded (all 7 days open)');
 
     console.log('✓ Database seeding completed successfully');
   } catch (error) {
