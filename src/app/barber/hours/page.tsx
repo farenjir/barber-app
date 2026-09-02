@@ -2,6 +2,13 @@ import { requireBarber } from '@/lib/auth-server';
 import { sql } from '@/db/client';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { AppShell } from '@/components/AppShell';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { Clock, Check } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -45,16 +52,15 @@ export default async function BarberHours({
 }) {
   const user = await requireBarber();
   
-  // Get barber ID
   const barber = await sql`
-    SELECT id FROM barbers WHERE user_id = ${user.id}
+    SELECT id, display_name FROM barbers WHERE user_id = ${user.id}
   ` as any[];
   
   if (barber.length === 0) {
     return (
-      <div dir="rtl" className="min-h-screen bg-gray-50 p-4">
-        <div className="max-w-4xl mx-auto bg-white p-8 rounded-lg shadow-md text-center">
-          <p className="text-red-600">شما به عنوان آرایشگر ثبت نشده‌اید.</p>
+      <div className="min-h-screen flex items-center justify-center p-6 bg-background">
+        <div className="bg-card border border-border rounded-lg p-8 shadow-lg text-center">
+          <p className="text-destructive">شما به عنوان آرایشگر ثبت نشده‌اید.</p>
         </div>
       </div>
     );
@@ -62,7 +68,6 @@ export default async function BarberHours({
   
   const barberId = barber[0].id;
   
-  // Get current working hours
   const workingHours = await sql`
     SELECT * FROM working_hours WHERE barber_id = ${barberId} ORDER BY weekday
   ` as any[];
@@ -72,29 +77,29 @@ export default async function BarberHours({
   const updateHoursAction = updateWorkingHours.bind(null, barberId as any) as any;
 
   return (
-    <div dir="rtl" className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-gray-800">ساعات کاری</h1>
-          <Link href="/barber" className="text-blue-600 hover:text-blue-800">بازگشت</Link>
+    <AppShell
+      userName={user.name}
+      userRole="barber"
+      barberName={barber[0].display_name}
+      pageTitle="ساعات کاری"
+    >
+      {searchParams.saved && (
+        <div className="mb-6 p-4 bg-green-600/10 border border-green-600/20 rounded-lg text-green-600 flex items-center gap-2">
+          <Check className="w-5 h-5" />
+          ساعات کاری با موفقیت ذخیره شد
         </div>
-      </header>
+      )}
       
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        {searchParams.saved && (
-          <div className="mb-4 p-4 bg-green-100 border border-green-300 rounded text-green-800">
-            ✓ ساعات کاری با موفقیت ذخیره شد
-          </div>
-        )}
-        
-        <form action={updateHoursAction} className="bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-xl font-bold mb-4">تنظیم ساعات کاری</h2>
-          
-          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded text-sm text-blue-800">
-            <strong>توجه:</strong> این پلتفرم برای آرایشگران مستقل است. هر آرایشگر روز تعطیل و ساعات کاری خودش را مشخص می‌کند. برای مثال، یک آرایشگر می‌تواند جمعه‌ها تعطیل باشد و دیگری باز.
+      <Card>
+        <CardHeader>
+          <CardTitle>تنظیم ساعات کاری</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="mb-6 p-4 bg-accent/20 border border-accent/30 rounded-lg text-sm">
+            <strong>توجه:</strong> این پلتفرم برای آرایشگران مستقل است. هر آرایشگر روز تعطیل و ساعات کاری خودش را مشخص می‌کند.
           </div>
           
-          <div className="space-y-4">
+          <form action={updateHoursAction} className="space-y-4">
             {WEEKDAYS.map((day) => {
               const hours = hoursMap.get(day.value);
               const isOpen = hours?.is_open ?? true;
@@ -102,14 +107,14 @@ export default async function BarberHours({
               const endTime = hours?.end_time ?? '21:00';
               
               return (
-                <div key={day.value} className="border rounded-lg p-4">
+                <div key={day.value} className="border border-border rounded-lg p-4">
                   <div className="flex items-center gap-4 mb-3">
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input
                         type="checkbox"
                         name={`is_open_${day.value}`}
                         defaultChecked={isOpen}
-                        className="w-5 h-5"
+                        className="w-5 h-5 accent-primary"
                       />
                       <span className="font-semibold text-lg">{day.label}</span>
                     </label>
@@ -117,22 +122,22 @@ export default async function BarberHours({
                   
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm text-gray-700 mb-1">ساعت شروع</label>
-                      <input
+                      <Label htmlFor={`start_${day.value}`}>ساعت شروع</Label>
+                      <Input
                         type="time"
+                        id={`start_${day.value}`}
                         name={`start_${day.value}`}
                         defaultValue={startTime}
-                        className="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500"
                         required
                       />
                     </div>
                     <div>
-                      <label className="block text-sm text-gray-700 mb-1">ساعت پایان</label>
-                      <input
+                      <Label htmlFor={`end_${day.value}`}>ساعت پایان</Label>
+                      <Input
                         type="time"
+                        id={`end_${day.value}`}
                         name={`end_${day.value}`}
                         defaultValue={endTime}
-                        className="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500"
                         required
                       />
                     </div>
@@ -140,18 +145,14 @@ export default async function BarberHours({
                 </div>
               );
             })}
-          </div>
-          
-          <div className="mt-6">
-            <button
-              type="submit"
-              className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold"
-            >
+            
+            <Button type="submit" className="w-full" size="lg">
+              <Clock className="w-4 h-4 ml-2" />
               ذخیره ساعات کاری
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+    </AppShell>
   );
 }

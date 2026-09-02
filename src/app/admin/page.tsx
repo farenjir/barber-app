@@ -1,6 +1,11 @@
 import { requireAdmin } from '@/lib/auth-server';
 import { sql } from '@/db/client';
 import Link from 'next/link';
+import { AppShell } from '@/components/AppShell';
+import { StatCard } from '@/components/StatCard';
+import { StatusBadge } from '@/components/StatusBadge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Users, Calendar, Settings, Scissors, Clock } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -48,67 +53,82 @@ export default async function AdminDashboard() {
   const stats = await getAdminStats();
 
   return (
-    <div dir="rtl" className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-800">پنل مدیریت</h1>
-            <p className="text-sm text-gray-600">سوپر ادمین</p>
-          </div>
-          <div className="text-left">
-            <p className="text-sm text-gray-600">{user.name}</p>
-          </div>
-        </div>
-      </header>
+    <AppShell
+      userName={user.name}
+      userRole="super_admin"
+      pageTitle="داشبورد مدیریت"
+    >
+      {/* Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <StatCard
+          title="آرایشگران فعال"
+          value={stats.barbersCount}
+          icon={<Scissors className="w-6 h-6" />}
+        />
+        <StatCard
+          title="مشتریان"
+          value={stats.customersCount}
+          icon={<Users className="w-6 h-6" />}
+        />
+        <StatCard
+          title="نوبت‌های امروز"
+          value={stats.todayAppointmentsCount}
+          icon={<Calendar className="w-6 h-6" />}
+        />
+      </div>
 
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white p-6 rounded-lg shadow-md">
-            <h3 className="text-sm text-gray-600 mb-2">آرایشگران فعال</h3>
-            <p className="text-3xl font-bold text-blue-600">{stats.barbersCount}</p>
-          </div>
-          <div className="bg-white p-6 rounded-lg shadow-md">
-            <h3 className="text-sm text-gray-600 mb-2">مشتریان</h3>
-            <p className="text-3xl font-bold text-green-600">{stats.customersCount}</p>
-          </div>
-          <div className="bg-white p-6 rounded-lg shadow-md">
-            <h3 className="text-sm text-gray-600 mb-2">نوبت‌های امروز</h3>
-            <p className="text-3xl font-bold text-purple-600">{stats.todayAppointmentsCount}</p>
-          </div>
-        </div>
-
-        {/* Quick Actions */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-          <h2 className="text-xl font-bold text-gray-800 mb-4">مدیریت</h2>
+      {/* Quick Actions */}
+      <Card className="mb-8">
+        <CardHeader>
+          <CardTitle>مدیریت سیستم</CardTitle>
+        </CardHeader>
+        <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Link href="/admin/barbers" className="p-4 bg-blue-50 rounded-lg text-center hover:bg-blue-100 transition">
-              <div className="text-3xl mb-2">👨‍💼</div>
-              <div className="text-sm font-semibold text-gray-700">آرایشگران</div>
+            <Link
+              href="/admin/barbers"
+              className="flex flex-col items-center gap-3 p-6 bg-accent/20 hover:bg-accent/30 rounded-lg transition-colors border border-border"
+            >
+              <Scissors className="w-8 h-8 text-accent" />
+              <span className="text-sm font-semibold text-foreground">آرایشگران</span>
             </Link>
-            <Link href="/admin/appointments" className="p-4 bg-green-50 rounded-lg text-center hover:bg-green-100 transition">
-              <div className="text-3xl mb-2">📅</div>
-              <div className="text-sm font-semibold text-gray-700">نوبت‌ها</div>
+            <Link
+              href="/admin/appointments"
+              className="flex flex-col items-center gap-3 p-6 bg-accent/20 hover:bg-accent/30 rounded-lg transition-colors border border-border"
+            >
+              <Calendar className="w-8 h-8 text-accent" />
+              <span className="text-sm font-semibold text-foreground">نوبت‌ها</span>
             </Link>
-            <Link href="/admin/customers" className="p-4 bg-purple-50 rounded-lg text-center hover:bg-purple-100 transition">
-              <div className="text-3xl mb-2">👥</div>
-              <div className="text-sm font-semibold text-gray-700">مشتریان</div>
+            <Link
+              href="/admin/customers"
+              className="flex flex-col items-center gap-3 p-6 bg-accent/20 hover:bg-accent/30 rounded-lg transition-colors border border-border"
+            >
+              <Users className="w-8 h-8 text-accent" />
+              <span className="text-sm font-semibold text-foreground">مشتریان</span>
             </Link>
-            <Link href="/admin/settings" className="p-4 bg-yellow-50 rounded-lg text-center hover:bg-yellow-100 transition">
-              <div className="text-3xl mb-2">⚙️</div>
-              <div className="text-sm font-semibold text-gray-700">تنظیمات</div>
+            <Link
+              href="/admin/settings"
+              className="flex flex-col items-center gap-3 p-6 bg-accent/20 hover:bg-accent/30 rounded-lg transition-colors border border-border"
+            >
+              <Settings className="w-8 h-8 text-accent" />
+              <span className="text-sm font-semibold text-foreground">تنظیمات</span>
             </Link>
           </div>
-        </div>
+        </CardContent>
+      </Card>
 
-        {/* Recent Appointments */}
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-xl font-bold text-gray-800 mb-4">آخرین نوبت‌ها</h2>
+      {/* Recent Appointments */}
+      <Card>
+        <CardHeader>
+          <CardTitle>آخرین نوبت‌ها</CardTitle>
+        </CardHeader>
+        <CardContent>
           {stats.recentAppointments.length === 0 ? (
-            <p className="text-gray-600 text-center py-8">نوبتی یافت نشد</p>
+            <div className="text-center py-12">
+              <Calendar className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+              <p className="text-muted-foreground">نوبتی یافت نشد</p>
+            </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-3">
               {stats.recentAppointments.map((appt: any) => {
                 const date = new Date(appt.appointment_time).toLocaleDateString('fa-IR', {
                   timeZone: 'Asia/Tehran',
@@ -118,40 +138,40 @@ export default async function AdminDashboard() {
                   hour: '2-digit',
                   minute: '2-digit',
                 });
-                const statusColors = {
-                  pending: 'bg-yellow-100 text-yellow-800',
-                  confirmed: 'bg-green-100 text-green-800',
-                  cancelled: 'bg-red-100 text-red-800',
-                };
-                const statusTexts = {
-                  pending: 'در انتظار',
-                  confirmed: 'تأیید شده',
-                  cancelled: 'لغو شده',
-                };
 
                 return (
-                  <div key={appt.id} className="border rounded-lg p-4 hover:bg-gray-50 transition">
-                    <div className="flex justify-between items-start mb-2">
+                  <div
+                    key={appt.id}
+                    className="border border-border rounded-lg p-4 hover:bg-accent/10 transition-colors"
+                  >
+                    <div className="flex justify-between items-start mb-3">
                       <div>
-                        <h3 className="font-semibold text-gray-800">{appt.customer_name}</h3>
-                        <p className="text-sm text-gray-600">{appt.barber_name}</p>
+                        <h3 className="font-semibold text-foreground text-lg">{appt.customer_name}</h3>
+                        <p className="text-sm text-muted-foreground">{appt.barber_name}</p>
                       </div>
-                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${statusColors[appt.status as keyof typeof statusColors]}`}>
-                        {statusTexts[appt.status as keyof typeof statusTexts]}
-                      </span>
+                      <StatusBadge status={appt.status} />
                     </div>
-                    <div className="flex items-center gap-4 text-sm text-gray-600">
-                      <span>📅 {date}</span>
-                      <span>⏰ {time}</span>
-                      <span>💇 {appt.service_name}</span>
+                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                      <span className="flex items-center gap-1">
+                        <Calendar className="w-4 h-4" />
+                        {date}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Clock className="w-4 h-4" />
+                        {time}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Scissors className="w-4 h-4" />
+                        {appt.service_name}
+                      </span>
                     </div>
                   </div>
                 );
               })}
             </div>
           )}
-        </div>
-      </div>
-    </div>
+        </CardContent>
+      </Card>
+    </AppShell>
   );
 }

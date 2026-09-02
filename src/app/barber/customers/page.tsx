@@ -1,8 +1,20 @@
 import { headers } from 'next/headers';
 import { sql } from '@/db/client';
-import Link from 'next/link';
+import { AppShell } from '@/components/AppShell';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Users } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
+
+async function getBarberData(userId: number) {
+  const barber = await sql`
+    SELECT id, display_name FROM barbers WHERE user_id = ${userId}
+  ` as any[];
+
+  if (barber.length === 0) return null;
+
+  return barber[0];
+}
 
 async function getBarberCustomers(userId: number) {
   const barber = await sql`
@@ -28,37 +40,53 @@ async function getBarberCustomers(userId: number) {
 export default async function BarberCustomers() {
   const headersList = await headers();
   const userId = parseInt(headersList.get('x-user-id') || '0');
+  const userName = headersList.get('x-user-name') || 'کاربر';
 
+  const barberData = await getBarberData(userId);
   const customers = await getBarberCustomers(userId);
 
-  return (
-    <div dir="rtl" className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-gray-800">لیست مشتریان</h1>
-          <Link href="/barber" className="text-blue-600 hover:text-blue-800">بازگشت</Link>
+  if (!barberData) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6 bg-background">
+        <div className="bg-card border border-border rounded-lg p-8 shadow-lg text-center">
+          <p className="text-destructive">شما به عنوان آرایشگر ثبت نشده‌اید.</p>
         </div>
-      </header>
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-xl font-bold mb-4">مشتریان</h2>
+      </div>
+    );
+  }
+
+  return (
+    <AppShell
+      userName={userName}
+      userRole="barber"
+      barberName={barberData.display_name}
+      pageTitle="لیست مشتریان"
+    >
+      <Card>
+        <CardHeader>
+          <CardTitle>مشتریان</CardTitle>
+        </CardHeader>
+        <CardContent>
           {customers.length === 0 ? (
-            <p className="text-gray-600 text-center py-8">مشتری‌ای یافت نشد</p>
+            <div className="text-center py-12">
+              <Users className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+              <p className="text-muted-foreground">مشتری‌ای یافت نشد</p>
+            </div>
           ) : (
             <div className="space-y-3">
               {customers.map((customer: any, idx: number) => (
-                <div key={idx} className="border rounded-lg p-4">
-                  <h3 className="font-semibold text-gray-800">{customer.customer_name}</h3>
-                  <p className="text-sm text-gray-600">{customer.customer_phone}</p>
-                  <p className="text-xs text-gray-500 mt-1">
+                <div key={idx} className="border border-border rounded-lg p-4 hover:bg-accent/10 transition-colors">
+                  <h3 className="font-semibold text-foreground">{customer.customer_name}</h3>
+                  <p className="text-sm text-muted-foreground">{customer.customer_phone}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
                     آخرین نوبت: {new Date(customer.last_appointment).toLocaleDateString('fa-IR')}
                   </p>
                 </div>
               ))}
             </div>
           )}
-        </div>
-      </div>
-    </div>
+        </CardContent>
+      </Card>
+    </AppShell>
   );
 }

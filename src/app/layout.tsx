@@ -1,6 +1,14 @@
+import './globals.css';
+import { Vazirmatn } from 'next/font/google';
+
+const vazirmatn = Vazirmatn({
+  subsets: ['arabic'],
+  display: 'swap',
+});
+
 export const metadata = {
-  title: 'Barber Appointment Bot',
-  description: 'Telegram booking bot for hairdresser appointments',
+  title: 'نوبت‌آرا',
+  description: 'سامانه نوبت‌دهی آرایشگاه',
 };
 
 export default function RootLayout({
@@ -10,7 +18,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="fa" dir="rtl">
-      <body>{children}</body>
+      <body className={vazirmatn.className}>{children}</body>
     </html>
   );
 }
