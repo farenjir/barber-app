@@ -86,13 +86,17 @@ interface BookingState {
 async function sendMessage(
   chatId: number,
   text: string,
-  replyMarkup?: any
+  replyMarkup?: any,
+  disableWebPagePreview?: boolean
 ): Promise<any> {
   console.log('[sendMessage] Sending to chat', chatId);
   
   const body: any = { chat_id: chatId, text };
   if (replyMarkup) {
     body.reply_markup = replyMarkup;
+  }
+  if (disableWebPagePreview) {
+    body.disable_web_page_preview = true;
   }
 
   const response = await fetch(`${TELEGRAM_API}/sendMessage`, {
@@ -199,7 +203,9 @@ async function handlePanelCommand(chatId: number, userId: number, request?: Requ
     
     await sendMessage(
       chatId,
-      `🔐 لینک ورود به پنل مدیریت:\n\n${magicLink}\n\n⏰ این لینک تا ۱۰ دقیقه دیگر معتبر است و فقط یک بار قابل استفاده می‌باشد.`
+      `🔐 لینک ورود به پنل مدیریت:\n\n${magicLink}\n\n⏰ این لینک تا ۱۰ دقیقه دیگر معتبر است و فقط یک بار قابل استفاده می‌باشد.`,
+      undefined,
+      true
     );
   } catch (error) {
     console.error('Error creating magic link:', error);
@@ -283,7 +289,7 @@ async function completeBarberRegistration(chatId: number, userId: number, displa
     const token = await createMagicLink(userDbId);
     const magicLink = `${appUrl}/api/auth/magic?token=${token}`;
     
-    await sendMessage(chatId, MESSAGES.barberRegistration.success(magicLink));
+    await sendMessage(chatId, MESSAGES.barberRegistration.success(magicLink), undefined, true);
   } catch (error) {
     console.error('Error in barber registration:', error);
     await sendMessage(chatId, MESSAGES.barberRegistration.error);
