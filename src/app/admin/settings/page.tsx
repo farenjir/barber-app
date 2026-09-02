@@ -1,73 +1,83 @@
 import { requireAdmin } from '@/lib/auth-server';
-import { AppShell } from '@/components/AppShell';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Settings } from 'lucide-react';
+import { AppShell } from '@/components/MantineAppShell';
+import { Paper, Text, Stack, Title, Code, Divider } from '@mantine/core';
 
 export const dynamic = 'force-dynamic';
 
 export default async function AdminSettings() {
   const user = await requireAdmin();
   
-  const salonName = process.env.SALON_NAME || 'سالن زیبایی';
-  const appUrl = process.env.APP_URL || process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '-';
+  const platformName = process.env.SALON_NAME || 'نوبت‌آرا';
+  const appUrl = process.env.APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '-');
+  const hasTelegramBot = !!process.env.TELEGRAM_BOT_TOKEN;
+  const hasDatabase = !!process.env.DATABASE_URL;
+  const hasAdminIds = !!process.env.ADMIN_TELEGRAM_IDS;
 
   const settings = [
-    { label: 'نام سالن', key: 'SALON_NAME', value: salonName },
+    { label: 'نام پلتفرم', key: 'SALON_NAME', value: platformName },
     { label: 'آدرس وب اپلیکیشن', key: 'APP_URL', value: appUrl },
-    { label: 'سوپر ادمین‌ها', key: 'ADMIN_TELEGRAM_IDS', value: 'پیکربندی شده' },
-    { label: 'ربات تلگرام', key: 'TELEGRAM_BOT_TOKEN', value: 'پیکربندی شده' },
-    { label: 'پایگاه داده', key: 'DATABASE_URL', value: 'متصل' },
+    { label: 'سوپر ادمین‌ها', key: 'ADMIN_TELEGRAM_IDS', value: hasAdminIds ? 'پیکربندی شده' : 'پیکربندی نشده' },
+    { label: 'ربات تلگرام', key: 'TELEGRAM_BOT_TOKEN', value: hasTelegramBot ? 'پیکربندی شده' : 'پیکربندی نشده' },
+    { label: 'پایگاه داده', key: 'DATABASE_URL', value: hasDatabase ? 'متصل' : 'پیکربندی نشده' },
   ];
 
   return (
     <AppShell
       userName={user.name}
       userRole="super_admin"
-      pageTitle="تنظیمات سالن"
+      pageTitle="تنظیمات"
     >
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>تنظیمات محیطی</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground mb-6">
+      <Stack gap="md">
+        <Paper p="lg" withBorder>
+          <Title order={3} mb="md">تنظیمات محیطی</Title>
+          <Text size="sm" c="dimmed" mb="lg">
             این تنظیمات از متغیرهای محیطی (Environment Variables) خوانده می‌شوند.
             برای تغییر، به تنظیمات Vercel مراجعه کنید.
-          </p>
+          </Text>
           
-          <div className="space-y-3">
+          <Stack gap="sm">
             {settings.map((setting) => (
-              <div key={setting.key} className="border border-border rounded-lg p-4 hover:bg-accent/10 transition-colors">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <h3 className="font-semibold text-foreground">{setting.label}</h3>
-                    <p className="text-sm text-muted-foreground mt-1">{setting.key}</p>
-                  </div>
-                  <div className="text-sm font-mono text-accent break-all max-w-md text-left">{setting.value}</div>
-                </div>
-              </div>
+              <Paper key={setting.key} p="md" withBorder style={{ backgroundColor: 'var(--mantine-color-gray-0)' }}>
+                <Stack gap="xs">
+                  <Text fw={600}>{setting.label}</Text>
+                  <Code>{setting.key}</Code>
+                  <Text size="sm" c="blue">{setting.value}</Text>
+                </Stack>
+              </Paper>
             ))}
-          </div>
-        </CardContent>
-      </Card>
-      
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Settings className="w-5 h-5" />
-            راهنمای متغیرها
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ul className="text-sm text-muted-foreground space-y-2">
-            <li>• <strong className="text-foreground">SALON_NAME:</strong> نام سالن که در پیام‌های ربات و پنل نمایش داده می‌شود</li>
-            <li>• <strong className="text-foreground">APP_URL:</strong> آدرس اصلی وب اپلیکیشن برای لینک‌های magic link</li>
-            <li>• <strong className="text-foreground">ADMIN_TELEGRAM_IDS:</strong> لیست Telegram ID های سوپر ادمین‌ها</li>
-            <li>• <strong className="text-foreground">TELEGRAM_BOT_TOKEN:</strong> توکن ربات تلگرام از @BotFather</li>
-            <li>• <strong className="text-foreground">DATABASE_URL:</strong> رشته اتصال به پایگاه داده PostgreSQL</li>
-          </ul>
-        </CardContent>
-      </Card>
+          </Stack>
+        </Paper>
+        
+        <Paper p="lg" withBorder>
+          <Title order={3} mb="md">راهنمای متغیرها</Title>
+          <Stack gap="sm">
+            <div>
+              <Text fw={600} size="sm">SALON_NAME</Text>
+              <Text size="sm" c="dimmed">نام پلتفرم که در پیام‌های ربات و پنل نمایش داده می‌شود</Text>
+            </div>
+            <Divider />
+            <div>
+              <Text fw={600} size="sm">APP_URL</Text>
+              <Text size="sm" c="dimmed">آدرس اصلی وب اپلیکیشن برای لینک‌های magic link و وب‌هوک تلگرام</Text>
+            </div>
+            <Divider />
+            <div>
+              <Text fw={600} size="sm">ADMIN_TELEGRAM_IDS</Text>
+              <Text size="sm" c="dimmed">لیست Telegram ID های سوپر ادمین‌ها (جدا شده با ویرگول)</Text>
+            </div>
+            <Divider />
+            <div>
+              <Text fw={600} size="sm">TELEGRAM_BOT_TOKEN</Text>
+              <Text size="sm" c="dimmed">توکن ربات تلگرام دریافت شده از @BotFather</Text>
+            </div>
+            <Divider />
+            <div>
+              <Text fw={600} size="sm">DATABASE_URL</Text>
+              <Text size="sm" c="dimmed">رشته اتصال به پایگاه داده PostgreSQL</Text>
+            </div>
+          </Stack>
+        </Paper>
+      </Stack>
     </AppShell>
   );
 }
