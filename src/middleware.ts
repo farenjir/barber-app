@@ -4,12 +4,13 @@ import type { NextRequest } from 'next/server';
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Public paths (webhooks, API routes, static assets, login)
+  // Public paths (webhooks, API routes, static assets, login, booking)
   if (
     pathname.startsWith('/api/') ||
     pathname.startsWith('/_next') ||
     pathname === '/login' ||
-    pathname === '/favicon.ico'
+    pathname === '/favicon.ico' ||
+    pathname.startsWith('/book/')
   ) {
     return NextResponse.next();
   }
@@ -20,7 +21,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // Protected paths - require session cookie
-  if (pathname.startsWith('/barber') || pathname.startsWith('/admin')) {
+  if (pathname.startsWith('/barber') || pathname.startsWith('/admin') || pathname.startsWith('/customer')) {
     const sessionToken = request.cookies.get('session')?.value;
 
     if (!sessionToken) {

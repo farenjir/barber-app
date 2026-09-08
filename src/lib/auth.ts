@@ -154,7 +154,7 @@ export async function verifyMagicLink(token: string): Promise<User | null> {
 export async function createSession(userId: number): Promise<string> {
   const token = generateToken();
   const tokenHash = await hashToken(token);
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+  const expiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000); // 1 year
 
   await sql`
     INSERT INTO sessions (token_hash, user_id, expires_at)

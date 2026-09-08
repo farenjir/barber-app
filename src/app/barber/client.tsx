@@ -19,7 +19,9 @@ interface BarberDashboardData {
 export default function BarberDashboardClient({ data }: { data: BarberDashboardData }) {
   const [processingAppt, setProcessingAppt] = useState<number | null>(null);
   const botUsername = process.env.NEXT_PUBLIC_BOT_USERNAME || 'BarberAppointmentAppBot';
-  const inviteLink = `https://t.me/${botUsername}?start=${data.barber.public_code}`;
+  const telegramInviteLink = `https://t.me/${botUsername}?start=${data.barber.public_code}`;
+  const appUrl = typeof window !== 'undefined' ? window.location.origin : '';
+  const webInviteLink = `${appUrl}/book/${data.barber.public_code}`;
 
   const handleConfirm = async (appointmentId: number) => {
     setProcessingAppt(appointmentId);
@@ -79,47 +81,57 @@ export default function BarberDashboardClient({ data }: { data: BarberDashboardD
   
   return (
     <Stack>
-      {/* Barber Code Card */}
+      {/* Barber Invite Links Card */}
       {data.barber.public_code && (
         <Paper p="md" withBorder>
           <Stack gap="md">
-            <Group justify="space-between" wrap="wrap">
-              <Group>
-                <IconKey size={32} />
-                <div>
-                  <Text size="xs" c="dimmed">کد آرایشگر شما</Text>
-                  <Text size="xl" fw={700} tt="uppercase">{data.barber.public_code}</Text>
-                </div>
-              </Group>
-              <CopyButton value={data.barber.public_code}>
-                {({ copied, copy }) => (
-                  <Group gap="xs">
-                    <Text size="sm">{copied ? 'کپی شد!' : 'کپی کد'}</Text>
-                    <ActionIcon color={copied ? 'teal' : 'gray'} onClick={copy} size="lg" variant="light">
-                      {copied ? <IconCheck size={20} /> : <IconCopy size={20} />}
-                    </ActionIcon>
-                  </Group>
-                )}
-              </CopyButton>
+            <Group>
+              <IconKey size={32} />
+              <div>
+                <Text size="xs" c="dimmed">لینک‌های دعوت مشتری</Text>
+                <Text size="sm" c="dimmed">کد شما: <Text span fw={700} tt="uppercase">{data.barber.public_code}</Text></Text>
+              </div>
             </Group>
             
-            <Group justify="space-between" wrap="wrap">
-              <Text size="xs" c="dimmed">لینک دعوت تلگرام</Text>
-              <CopyButton value={inviteLink}>
-                {({ copied, copy }) => (
-                  <Group gap="xs">
-                    <Text size="sm">{copied ? 'کپی شد!' : 'لینک دعوت'}</Text>
-                    <ActionIcon color={copied ? 'teal' : 'gray'} onClick={copy} size="lg" variant="light">
-                      {copied ? <IconCheck size={20} /> : <IconCopy size={20} />}
-                    </ActionIcon>
-                  </Group>
-                )}
-              </CopyButton>
-            </Group>
+            <Stack gap="sm">
+              <Group justify="space-between" wrap="wrap">
+                <Text size="sm" fw={500}>لینک دعوت تلگرام</Text>
+                <CopyButton value={telegramInviteLink}>
+                  {({ copied, copy }) => (
+                    <Button
+                      variant="light"
+                      size="xs"
+                      color={copied ? 'teal' : 'blue'}
+                      leftSection={copied ? <IconCheck size={16} /> : <IconCopy size={16} />}
+                      onClick={copy}
+                    >
+                      {copied ? 'کپی شد!' : 'کپی لینک'}
+                    </Button>
+                  )}
+                </CopyButton>
+              </Group>
+              
+              <Group justify="space-between" wrap="wrap">
+                <Text size="sm" fw={500}>لینک دعوت وب</Text>
+                <CopyButton value={webInviteLink}>
+                  {({ copied, copy }) => (
+                    <Button
+                      variant="light"
+                      size="xs"
+                      color={copied ? 'teal' : 'blue'}
+                      leftSection={copied ? <IconCheck size={16} /> : <IconCopy size={16} />}
+                      onClick={copy}
+                    >
+                      {copied ? 'کپی شد!' : 'کپی لینک'}
+                    </Button>
+                  )}
+                </CopyButton>
+              </Group>
+            </Stack>
           </Stack>
           
           <Text size="xs" c="dimmed" mt="md">
-            مشتریان می‌توانند با این کد یا لینک دعوت، مستقیماً از شما نوبت رزرو کنند.
+            مشتریان می‌توانند از طریق تلگرام یا وب از شما نوبت رزرو کنند.
           </Text>
         </Paper>
       )}
