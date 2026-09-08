@@ -33,8 +33,9 @@ export async function GET(request: NextRequest) {
     destination = '/admin';
   } else if (user.role === 'barber') {
     destination = '/barber';
+  } else if (user.role === 'customer') {
+    destination = '/customer';
   } else {
-    // Customers don't have web access
     return NextResponse.redirect(new URL('/login?error=forbidden', request.url));
   }
 
@@ -43,10 +44,10 @@ export async function GET(request: NextRequest) {
   
   response.cookies.set('session', sessionToken, {
     httpOnly: true,
-    secure: true, // Always secure in production URLs
+    secure: true,
     sameSite: 'lax',
     path: '/',
-    maxAge: 7 * 24 * 60 * 60, // 7 days
+    maxAge: 365 * 24 * 60 * 60, // 1 year
   });
 
   return response;

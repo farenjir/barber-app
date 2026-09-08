@@ -43,6 +43,7 @@ export const MESSAGES = {
     menuNewBooking: '📅 رزرو جدید',
     menuMyBookings: '📋 نوبت‌های من',
     menuCancel: '❌ لغو نوبت',
+    menuWebLogin: '🌐 ورود به وب',
     menuHelp: '❓ راهنما',
     menuChangeBarber: '🔄 تغییر آرایشگر',
     menuMain: '🏠 منوی اصلی',
@@ -84,10 +85,11 @@ export const MESSAGES = {
     menuHelp: '❓ راهنما',
     menuMain: '🏠 منوی اصلی',
     
-    codeInfo: (code: string, inviteLink: string) =>
+    codeInfo: (code: string, telegramInviteLink: string, webInviteLink: string) =>
       `🔑 کد شما: ${code}\n\n` +
-      `🔗 لینک دعوت:\n${inviteLink}\n\n` +
-      `این لینک را با مشتریان خود به اشتراک بگذارید تا بتوانند مستقیماً نوبت رزرو کنند.`,
+      `🔗 لینک دعوت تلگرام:\n${telegramInviteLink}\n\n` +
+      `🌐 لینک دعوت وب:\n${webInviteLink}\n\n` +
+      `این لینک‌ها را با مشتریان خود به اشتراک بگذارید تا بتوانند از طریق تلگرام یا وب نوبت رزرو کنند.`,
     
     help: 
       `*راهنمای آرایشگر:*\n\n` +

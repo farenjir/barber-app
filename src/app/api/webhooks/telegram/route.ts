@@ -261,8 +261,8 @@ async function showCustomerMenu(chatId: number, userId: number): Promise<void> {
     keyboard: [
       [{ text: MESSAGES.customer.menuNewBooking }],
       [{ text: MESSAGES.customer.menuMyBookings }, { text: MESSAGES.customer.menuCancel }],
-      [{ text: MESSAGES.customer.menuChangeBarber }, { text: MESSAGES.customer.menuHelp }],
-      [{ text: MESSAGES.customer.menuMain }],
+      [{ text: MESSAGES.customer.menuWebLogin }, { text: MESSAGES.customer.menuHelp }],
+      [{ text: MESSAGES.customer.menuChangeBarber }, { text: MESSAGES.customer.menuMain }],
     ],
     resize_keyboard: true,
     one_time_keyboard: false,
@@ -338,6 +338,21 @@ async function completeBarberSignup(chatId: number, userId: number, displayName:
       `;
     }
     
+    // Seed default services
+    const defaultServices = [
+      { name: 'اصلاح مو', duration_minutes: 45, price_toman: 350000 },
+      { name: 'اصلاح ریش', duration_minutes: 20, price_toman: 150000 },
+      { name: 'رنگ مو', duration_minutes: 90, price_toman: 1200000 },
+      { name: 'اصلاح ابرو', duration_minutes: 15, price_toman: 200000 },
+    ];
+    
+    for (const service of defaultServices) {
+      await sql`
+        INSERT INTO services (barber_id, name, duration_minutes, price_toman, is_active)
+        VALUES (${barberId}, ${service.name}, ${service.duration_minutes}, ${service.price_toman}, true)
+      `;
+    }
+    
     await clearUserState(userId);
     
     // Generate magic link
@@ -376,7 +391,7 @@ async function showBarberMenu(chatId: number, userId: number): Promise<void> {
 }
 
 // Show barber code
-async function showBarberCode(chatId: number, userId: number): Promise<void> {
+async function showBarberCode(chatId: number, userId: number, request?: Request): Promise<void> {
   const user = await getUserByTelegramId(userId);
   if (!user) return;
   
@@ -387,9 +402,11 @@ async function showBarberCode(chatId: number, userId: number): Promise<void> {
   }
   
   const code = await ensureBarberCode(barber.id);
-  const inviteLink = `https://t.me/${BOT_USERNAME}?start=${code}`;
+  const telegramInviteLink = `https://t.me/${BOT_USERNAME}?start=${code}`;
+  const appUrl = getAppUrl(request);
+  const webInviteLink = `${appUrl}/book/${code}`;
   
-  await sendMessage(chatId, MESSAGES.barber.codeInfo(code, inviteLink), undefined, true);
+  await sendMessage(chatId, MESSAGES.barber.codeInfo(code, telegramInviteLink, webInviteLink), undefined, true);
 }
 
 // Admin flow
@@ -456,6 +473,38 @@ async function handlePanelCommand(chatId: number, userId: number, request?: Requ
     );
   } catch (error) {
     console.error('Error creating magic link:', error);
+    await sendMessage(chatId, 'خطا در ایجاد لینک ورود.');
+  }
+}
+
+// Handle customer web login
+async function handleCustomerWebLogin(chatId: number, userId: number, request?: Request): Promise<void> {
+  const user = await getUserByTelegramId(userId);
+  
+  if (!user) {
+    await sendMessage(chatId, 'خطا در دریافت اطلاعات کاربر.');
+    return;
+  }
+
+  const appUrl = getAppUrl(request);
+  
+  if (!appUrl || appUrl === 'http://localhost:3000') {
+    await sendMessage(chatId, 'پنل وب در دسترس نیست.');
+    return;
+  }
+
+  try {
+    const token = await createMagicLink(user.id);
+    const magicLink = `${appUrl}/api/auth/magic?token=${token}`;
+    
+    await sendMessage(
+      chatId,
+      `🔐 لینک ورود به وب:\n\n${magicLink}\n\n⏰ لینک تا ۱۰ دقیقه معتبر است.\n\nبا این لینک می‌توانید نوبت‌های خود را در وب مشاهده کنید.`,
+      undefined,
+      true
+    );
+  } catch (error) {
+    console.error('Error creating customer magic link:', error);
     await sendMessage(chatId, 'خطا در ایجاد لینک ورود.');
   }
 }
@@ -601,6 +650,10 @@ async function handleText(chatId: number, userId: number, text: string, request?
     await startCustomerFlow(chatId, userId);
     return;
   }
+  if (text === MESSAGES.customer.menuWebLogin) {
+    await handleCustomerWebLogin(chatId, userId, request);
+    return;
+  }
   if (text === MESSAGES.customer.menuMain || text === MESSAGES.barber.menuMain) {
     await showRolePicker(chatId, userId);
     return;
@@ -619,7 +672,7 @@ async function handleText(chatId: number, userId: number, text: string, request?
     return;
   }
   if (text === MESSAGES.barber.menuMyCode) {
-    await showBarberCode(chatId, userId);
+    await showBarberCode(chatId, userId, request);
     return;
   }
   if (text === MESSAGES.barber.menuHelp) {
@@ -716,7 +769,7 @@ async function handleBookingConfirm(chatId: number, userId: number): Promise<voi
 
   // Check availability
   if (!(await isSlotAvailable(state.barberId, appointmentTime, state.duration))) {
-    await sendMessage(chatId, 'متأسفانه این زمان دیگر در دسترس نیست.');
+    await sendMessage(chatId, 'متأسفانه این زمان دیگر رزرو شده است. لطفاً ساعت دیگری انتخاب کنید.');
     await clearUserState(userId);
     return;
   }

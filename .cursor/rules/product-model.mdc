@@ -13,7 +13,7 @@ description: Product domain and business rules
 
 ## User Roles
 
-1. **Customers**: Telegram-only (book via bot with barber code)
+1. **Customers**: Can book via Telegram bot (with barber code) OR web at `/book/<code>`. Can view their appointments on web at `/customer` after logging in via magic link from Telegram
 2. **Barbers**: Web panel at `/barber/*` (view bookings, manage services/hours)
 3. **Super Admin**: Web panel at `/admin/*` (manage all barbers, system-wide view)
 

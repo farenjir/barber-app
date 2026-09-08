@@ -53,3 +53,10 @@ export async function requireBarber(): Promise<User> {
 export async function requireAdmin(): Promise<User> {
   return requireRole(['super_admin']);
 }
+
+/**
+ * Get the authenticated customer user
+ */
+export async function requireCustomer(): Promise<User> {
+  return requireRole(['customer']);
+}
