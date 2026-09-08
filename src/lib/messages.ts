@@ -182,6 +182,16 @@ export const MESSAGES = {
   
   bookingCancelled: '✅ نوبت شما با موفقیت لغو شد.',
   
+  appointmentCancelled: 
+    '❌ نوبت شما توسط آرایشگر لغو شد.\n\n' +
+    'برای رزرو نوبت جدید از منو استفاده کنید.',
+  
+  appointmentRescheduled: (serviceName: string, newDateTime: string) =>
+    `🔄 نوبت شما جابه‌جا شد!\n\n` +
+    `خدمت: ${serviceName}\n` +
+    `زمان جدید: ${newDateTime}\n\n` +
+    `منتظر دیدار شما هستیم.`,
+  
   noUpcomingBookings: 'شما نوبت آینده‌ای ندارید.',
   
   myBookings: '📋 *نوبت‌های شما:*\n\n',

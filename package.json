@@ -50,6 +50,7 @@
     "@types/react-dom": "^19.2.5",
     "postcss": "^8.5.26",
     "postcss-simple-vars": "^7.0.1",
+    "sharp": "^0.35.4",
     "ts-node": "^10.9.2",
     "vitest": "^4.1.11"
   }

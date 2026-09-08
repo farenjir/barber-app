@@ -3,12 +3,13 @@
 import { useState } from 'react';
 import { WeekView, ScheduleEventData } from '@mantine/schedule';
 import { Paper, Badge, Stack, Group, Modal, Text, Divider, Button } from '@mantine/core';
+import { DateTimePicker } from '@mantine/dates';
 import { notifications } from '@mantine/notifications';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 import { toJalaali } from 'jalaali-js';
-import { confirmAppointment, rejectAppointment } from '../appointments/actions';
+import { confirmAppointment, rejectAppointment, cancelAppointment, rescheduleAppointment } from '../appointments/actions';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -48,6 +49,10 @@ export default function CalendarClient({ appointments, startTime, endTime }: Cal
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [modalOpened, setModalOpened] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [rescheduleModalOpen, setRescheduleModalOpen] = useState(false);
+  const [newDateTime, setNewDateTime] = useState<Date | null>(null);
+  const [cancelModalOpen, setCancelModalOpen] = useState(false);
+  const [optimisticEvents, setOptimisticEvents] = useState<ScheduleEventData[]>([]);
 
   // Normalize TIME fields from postgres (could be Date objects) to HH:mm:ss strings
   const normalizedStartTime = typeof startTime === 'string' ? startTime : 
@@ -56,7 +61,7 @@ export default function CalendarClient({ appointments, startTime, endTime }: Cal
     dayjs(endTime).format('HH:mm:ss');
 
   // Convert appointments to schedule events
-  const events: ScheduleEventData[] = appointments.map((appt) => {
+  const baseEvents: ScheduleEventData[] = appointments.map((appt) => {
     const appointmentTime = dayjs(appt.appointment_time).tz('Asia/Tehran');
     const eventEndTime = appointmentTime.add(appt.duration_minutes, 'minute');
     
@@ -68,6 +73,9 @@ export default function CalendarClient({ appointments, startTime, endTime }: Cal
       color: appt.status === 'confirmed' ? 'green' : 'orange',
     };
   });
+
+  // Use optimistic events if available, otherwise base events
+  const events = optimisticEvents.length > 0 ? optimisticEvents : baseEvents;
 
   // Format weekday with Jalali day number (e.g., "شنبه ۱۱")
   const weekdayFormat = (dateStr: string): string => {
@@ -204,6 +212,137 @@ export default function CalendarClient({ appointments, startTime, endTime }: Cal
     }
   };
 
+  const openRescheduleModal = () => {
+    if (!selectedAppointment) return;
+    setNewDateTime(new Date(selectedAppointment.appointment_time));
+    setModalOpened(false);
+    setRescheduleModalOpen(true);
+  };
+
+  const handleReschedule = async () => {
+    if (!selectedAppointment || !newDateTime) return;
+    
+    setIsProcessing(true);
+    try {
+      const tehranTime = dayjs(newDateTime).tz('Asia/Tehran');
+      const result = await rescheduleAppointment(selectedAppointment.id, tehranTime.toISOString());
+      if (result.success) {
+        notifications.show({
+          title: 'موفق',
+          message: 'نوبت جابه‌جا شد',
+          color: 'green',
+        });
+        setRescheduleModalOpen(false);
+        setSelectedAppointment(null);
+        setNewDateTime(null);
+      } else {
+        notifications.show({
+          title: 'خطا',
+          message: result.error || 'خطا در جابه‌جایی نوبت',
+          color: 'red',
+        });
+      }
+    } catch (error) {
+      notifications.show({
+        title: 'خطا',
+        message: 'خطا در جابه‌جایی نوبت',
+        color: 'red',
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const openCancelModal = () => {
+    setModalOpened(false);
+    setCancelModalOpen(true);
+  };
+
+  const handleCancel = async () => {
+    if (!selectedAppointment) return;
+    
+    setIsProcessing(true);
+    try {
+      const result = await cancelAppointment(selectedAppointment.id);
+      if (result.success) {
+        notifications.show({
+          title: 'موفق',
+          message: 'نوبت لغو شد',
+          color: 'blue',
+        });
+        setCancelModalOpen(false);
+        setSelectedAppointment(null);
+      } else {
+        notifications.show({
+          title: 'خطا',
+          message: result.error || 'خطا در لغو نوبت',
+          color: 'red',
+        });
+      }
+    } catch (error) {
+      notifications.show({
+        title: 'خطا',
+        message: 'خطا در لغو نوبت',
+        color: 'red',
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleEventDrop = async ({ eventId, newStart, newEnd }: {
+    eventId: string | number;
+    newStart: string;
+    newEnd: string;
+  }) => {
+    const appointment = appointments.find(appt => appt.id.toString() === eventId.toString());
+    if (!appointment) return;
+    
+    // Optimistically update UI
+    const updatedEvents = baseEvents.map(event => {
+      if (event.id === eventId.toString()) {
+        return {
+          ...event,
+          start: dayjs(newStart).tz('Asia/Tehran').format('YYYY-MM-DD HH:mm:ss'),
+          end: dayjs(newEnd).tz('Asia/Tehran').format('YYYY-MM-DD HH:mm:ss'),
+        };
+      }
+      return event;
+    });
+    setOptimisticEvents(updatedEvents);
+    
+    const newTime = dayjs(newStart).tz('Asia/Tehran');
+    
+    try {
+      const result = await rescheduleAppointment(appointment.id, newTime.toISOString());
+      if (result.success) {
+        notifications.show({
+          title: 'موفق',
+          message: 'نوبت جابه‌جا شد',
+          color: 'green',
+        });
+        // Clear optimistic state on success (server will revalidate)
+        setOptimisticEvents([]);
+      } else {
+        // Rollback on failure
+        setOptimisticEvents([]);
+        notifications.show({
+          title: 'خطا',
+          message: result.error || 'خطا در جابه‌جایی نوبت',
+          color: 'red',
+        });
+      }
+    } catch (error) {
+      // Rollback on error
+      setOptimisticEvents([]);
+      notifications.show({
+        title: 'خطا',
+        message: 'خطا در جابه‌جایی نوبت',
+        color: 'red',
+      });
+    }
+  };
+
   return (
     <Stack>
       <Paper withBorder>
@@ -212,6 +351,8 @@ export default function CalendarClient({ appointments, startTime, endTime }: Cal
           date={currentDate}
           onDateChange={setCurrentDate}
           onEventClick={handleEventClick}
+          withEventsDragAndDrop
+          onEventDrop={handleEventDrop}
           startTime={normalizedStartTime}
           endTime={normalizedEndTime}
           firstDayOfWeek={6}
@@ -283,9 +424,9 @@ export default function CalendarClient({ appointments, startTime, endTime }: Cal
               </Badge>
             </div>
 
-            {selectedAppointment.status === 'pending' && (
-              <>
-                <Divider />
+            <Divider />
+            <Stack gap="sm">
+              {selectedAppointment.status === 'pending' && (
                 <Group gap="sm">
                   <Button
                     flex={1}
@@ -307,10 +448,115 @@ export default function CalendarClient({ appointments, startTime, endTime }: Cal
                     رد
                   </Button>
                 </Group>
-              </>
-            )}
+              )}
+              <Group gap="sm">
+                <Button
+                  flex={1}
+                  color="blue"
+                  variant="light"
+                  onClick={openRescheduleModal}
+                  disabled={isProcessing}
+                >
+                  تغییر زمان
+                </Button>
+                <Button
+                  flex={1}
+                  color="red"
+                  variant="subtle"
+                  onClick={openCancelModal}
+                  disabled={isProcessing}
+                >
+                  لغو
+                </Button>
+              </Group>
+            </Stack>
           </Stack>
         )}
+      </Modal>
+
+      <Modal
+        opened={rescheduleModalOpen}
+        onClose={() => setRescheduleModalOpen(false)}
+        title="تغییر زمان نوبت"
+        size="md"
+        centered
+      >
+        <Stack gap="md">
+          {selectedAppointment && (
+            <>
+              <Text size="sm">
+                نوبت: {selectedAppointment.customer_name} - {selectedAppointment.service_name}
+              </Text>
+              <DateTimePicker
+                label="تاریخ و زمان جدید"
+                placeholder="تاریخ و زمان را انتخاب کنید"
+                value={newDateTime}
+                onChange={(value) => setNewDateTime(value ? new Date(value) : null)}
+                locale="fa-IR"
+                clearable={false}
+              />
+              <Group gap="sm">
+                <Button
+                  flex={1}
+                  color="blue"
+                  onClick={handleReschedule}
+                  loading={isProcessing}
+                  disabled={!newDateTime || isProcessing}
+                >
+                  تأیید تغییر
+                </Button>
+                <Button
+                  flex={1}
+                  variant="outline"
+                  onClick={() => setRescheduleModalOpen(false)}
+                  disabled={isProcessing}
+                >
+                  انصراف
+                </Button>
+              </Group>
+            </>
+          )}
+        </Stack>
+      </Modal>
+
+      <Modal
+        opened={cancelModalOpen}
+        onClose={() => setCancelModalOpen(false)}
+        title="لغو نوبت"
+        size="md"
+        centered
+      >
+        <Stack gap="md">
+          {selectedAppointment && (
+            <>
+              <Text size="sm">
+                آیا مطمئن هستید که می‌خواهید این نوبت را لغو کنید؟
+              </Text>
+              <Text size="sm" fw={600}>
+                {selectedAppointment.customer_name} - {selectedAppointment.service_name}
+              </Text>
+              <Group gap="sm">
+                <Button
+                  flex={1}
+                  color="red"
+                  onClick={handleCancel}
+                  loading={isProcessing}
+                  disabled={isProcessing}
+                >
+                  تأیید لغو
+                </Button>
+                <Button
+                  flex={1}
+                  variant="outline"
+                  onClick={() => setCancelModalOpen(false)}
+                  disabled={isProcessing}
+                >
+                  انصراف
+                </Button>
+              </Group>
+            </>
+          )}
+        </Stack>
       </Modal>
     </Stack>
   );

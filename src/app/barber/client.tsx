@@ -1,12 +1,19 @@
 'use client';
 
 import { useState } from 'react';
-import { Paper, SimpleGrid, Text, Badge, Stack, Group, CopyButton, ActionIcon, Tooltip, Button } from '@mantine/core';
+import { Paper, SimpleGrid, Text, Badge, Stack, Group, CopyButton, ActionIcon, Tooltip, Button, Modal } from '@mantine/core';
 import { BarChart } from '@mantine/charts';
 import { IconCalendar, IconScissors, IconClock, IconCopy, IconCheck, IconKey } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
+import { DateTimePicker } from '@mantine/dates';
 import Link from 'next/link';
-import { confirmAppointment, rejectAppointment } from './appointments/actions';
+import { confirmAppointment, rejectAppointment, cancelAppointment, rescheduleAppointment } from './appointments/actions';
+import dayjs from 'dayjs';
+import timezone from 'dayjs/plugin/timezone';
+import utc from 'dayjs/plugin/utc';
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 interface BarberDashboardData {
   barber: any;
@@ -18,6 +25,11 @@ interface BarberDashboardData {
 
 export default function BarberDashboardClient({ data }: { data: BarberDashboardData }) {
   const [processingAppt, setProcessingAppt] = useState<number | null>(null);
+  const [rescheduleModalOpen, setRescheduleModalOpen] = useState(false);
+  const [selectedApptForReschedule, setSelectedApptForReschedule] = useState<any | null>(null);
+  const [newDateTime, setNewDateTime] = useState<Date | null>(null);
+  const [cancelModalOpen, setCancelModalOpen] = useState(false);
+  const [selectedApptForCancel, setSelectedApptForCancel] = useState<any | null>(null);
   const botUsername = process.env.NEXT_PUBLIC_BOT_USERNAME || 'BarberAppointmentAppBot';
   const telegramInviteLink = `https://t.me/${botUsername}?start=${data.barber.public_code}`;
   const appUrl = typeof window !== 'undefined' ? window.location.origin : '';
@@ -72,6 +84,83 @@ export default function BarberDashboardClient({ data }: { data: BarberDashboardD
       notifications.show({
         title: 'خطا',
         message: 'خطا در رد نوبت',
+        color: 'red',
+      });
+    } finally {
+      setProcessingAppt(null);
+    }
+  };
+
+  const openRescheduleModal = (appt: any) => {
+    setSelectedApptForReschedule(appt);
+    setNewDateTime(new Date(appt.appointment_time));
+    setRescheduleModalOpen(true);
+  };
+
+  const handleReschedule = async () => {
+    if (!selectedApptForReschedule || !newDateTime) return;
+    
+    setProcessingAppt(selectedApptForReschedule.id);
+    try {
+      const tehranTime = dayjs(newDateTime).tz('Asia/Tehran');
+      const result = await rescheduleAppointment(selectedApptForReschedule.id, tehranTime.toISOString());
+      if (result.success) {
+        notifications.show({
+          title: 'موفق',
+          message: 'نوبت جابه‌جا شد',
+          color: 'green',
+        });
+        setRescheduleModalOpen(false);
+        setSelectedApptForReschedule(null);
+        setNewDateTime(null);
+      } else {
+        notifications.show({
+          title: 'خطا',
+          message: result.error || 'خطا در جابه‌جایی نوبت',
+          color: 'red',
+        });
+      }
+    } catch (error) {
+      notifications.show({
+        title: 'خطا',
+        message: 'خطا در جابه‌جایی نوبت',
+        color: 'red',
+      });
+    } finally {
+      setProcessingAppt(null);
+    }
+  };
+
+  const openCancelModal = (appt: any) => {
+    setSelectedApptForCancel(appt);
+    setCancelModalOpen(true);
+  };
+
+  const handleCancel = async () => {
+    if (!selectedApptForCancel) return;
+    
+    setProcessingAppt(selectedApptForCancel.id);
+    try {
+      const result = await cancelAppointment(selectedApptForCancel.id);
+      if (result.success) {
+        notifications.show({
+          title: 'موفق',
+          message: 'نوبت لغو شد',
+          color: 'blue',
+        });
+        setCancelModalOpen(false);
+        setSelectedApptForCancel(null);
+      } else {
+        notifications.show({
+          title: 'خطا',
+          message: result.error || 'خطا در لغو نوبت',
+          color: 'red',
+        });
+      }
+    } catch (error) {
+      notifications.show({
+        title: 'خطا',
+        message: 'خطا در لغو نوبت',
         color: 'red',
       });
     } finally {
@@ -214,29 +303,49 @@ export default function BarberDashboardClient({ data }: { data: BarberDashboardD
                       </Stack>
                     </Group>
                     
-                    {isPending && (
-                      <Group gap="sm">
-                        <Button
-                          size="sm"
-                          color="green"
-                          onClick={() => handleConfirm(appt.id)}
-                          loading={isProcessing}
-                          disabled={isProcessing}
-                        >
-                          تأیید
-                        </Button>
-                        <Button
-                          size="sm"
-                          color="red"
-                          variant="outline"
-                          onClick={() => handleReject(appt.id)}
-                          loading={isProcessing}
-                          disabled={isProcessing}
-                        >
-                          رد
-                        </Button>
-                      </Group>
-                    )}
+                    <Group gap="sm" wrap="wrap">
+                      {isPending && (
+                        <>
+                          <Button
+                            size="sm"
+                            color="green"
+                            onClick={() => handleConfirm(appt.id)}
+                            loading={isProcessing}
+                            disabled={isProcessing}
+                          >
+                            تأیید
+                          </Button>
+                          <Button
+                            size="sm"
+                            color="red"
+                            variant="outline"
+                            onClick={() => handleReject(appt.id)}
+                            loading={isProcessing}
+                            disabled={isProcessing}
+                          >
+                            رد
+                          </Button>
+                        </>
+                      )}
+                      <Button
+                        size="sm"
+                        color="blue"
+                        variant="light"
+                        onClick={() => openRescheduleModal(appt)}
+                        disabled={isProcessing}
+                      >
+                        جابه‌جایی
+                      </Button>
+                      <Button
+                        size="sm"
+                        color="red"
+                        variant="subtle"
+                        onClick={() => openCancelModal(appt)}
+                        disabled={isProcessing}
+                      >
+                        لغو
+                      </Button>
+                    </Group>
                   </Stack>
                 </Paper>
               );
@@ -287,6 +396,91 @@ export default function BarberDashboardClient({ data }: { data: BarberDashboardD
           </Paper>
         </Link>
       </SimpleGrid>
+
+      <Modal
+        opened={rescheduleModalOpen}
+        onClose={() => setRescheduleModalOpen(false)}
+        title="جابه‌جایی نوبت"
+        size="md"
+        centered
+      >
+        <Stack gap="md">
+          {selectedApptForReschedule && (
+            <>
+              <Text size="sm">
+                نوبت: {selectedApptForReschedule.customer_name} - {selectedApptForReschedule.service_name}
+              </Text>
+              <DateTimePicker
+                label="تاریخ و زمان جدید"
+                placeholder="تاریخ و زمان را انتخاب کنید"
+                value={newDateTime}
+                onChange={(value) => setNewDateTime(value ? new Date(value) : null)}
+                locale="fa-IR"
+                clearable={false}
+              />
+              <Group gap="sm">
+                <Button
+                  flex={1}
+                  color="blue"
+                  onClick={handleReschedule}
+                  loading={processingAppt === selectedApptForReschedule.id}
+                  disabled={!newDateTime || processingAppt === selectedApptForReschedule.id}
+                >
+                  تأیید جابه‌جایی
+                </Button>
+                <Button
+                  flex={1}
+                  variant="outline"
+                  onClick={() => setRescheduleModalOpen(false)}
+                  disabled={processingAppt === selectedApptForReschedule.id}
+                >
+                  انصراف
+                </Button>
+              </Group>
+            </>
+          )}
+        </Stack>
+      </Modal>
+
+      <Modal
+        opened={cancelModalOpen}
+        onClose={() => setCancelModalOpen(false)}
+        title="لغو نوبت"
+        size="md"
+        centered
+      >
+        <Stack gap="md">
+          {selectedApptForCancel && (
+            <>
+              <Text size="sm">
+                آیا مطمئن هستید که می‌خواهید این نوبت را لغو کنید؟
+              </Text>
+              <Text size="sm" fw={600}>
+                {selectedApptForCancel.customer_name} - {selectedApptForCancel.service_name}
+              </Text>
+              <Group gap="sm">
+                <Button
+                  flex={1}
+                  color="red"
+                  onClick={handleCancel}
+                  loading={processingAppt === selectedApptForCancel.id}
+                  disabled={processingAppt === selectedApptForCancel.id}
+                >
+                  تأیید لغو
+                </Button>
+                <Button
+                  flex={1}
+                  variant="outline"
+                  onClick={() => setCancelModalOpen(false)}
+                  disabled={processingAppt === selectedApptForCancel.id}
+                >
+                  انصراف
+                </Button>
+              </Group>
+            </>
+          )}
+        </Stack>
+      </Modal>
     </Stack>
   );
 }
