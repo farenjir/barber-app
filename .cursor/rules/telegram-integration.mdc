@@ -19,6 +19,7 @@ globs:
 
 ## Customer Access
 
-- Customers book via Telegram bot only (no web UI for customers)
+- Customers book via Telegram bot OR web at `/book/<code>` with barber's web invite link
+- Customers can access their appointments on web at `/customer` via magic link from Telegram bot (ورود به وب)
 - Barbers and admins use web panels
-- Customers access barber via `/start` parameter with barber code
+- Telegram customers access barber via `/start` parameter with barber code

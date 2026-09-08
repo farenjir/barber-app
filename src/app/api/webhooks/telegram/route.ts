@@ -379,7 +379,7 @@ async function completeBarberSignup(chatId: number, userId: number, displayName:
 async function showBarberMenu(chatId: number, userId: number): Promise<void> {
   const keyboard = {
     keyboard: [
-      [{ text: MESSAGES.barber.menuToday }],
+      [{ text: MESSAGES.barber.menuToday }, { text: MESSAGES.barber.menuUpcoming }],
       [{ text: MESSAGES.barber.menuPanel }, { text: MESSAGES.barber.menuMyCode }],
       [{ text: MESSAGES.barber.menuHelp }],
       [{ text: MESSAGES.barber.menuMain }],
@@ -667,6 +667,10 @@ async function handleText(chatId: number, userId: number, text: string, request?
     }
     return;
   }
+  if (text === MESSAGES.barber.menuUpcoming) {
+    await handleBarberManageAppointments(chatId, userId);
+    return;
+  }
   if (text === MESSAGES.barber.menuPanel) {
     await handlePanelCommand(chatId, userId, request);
     return;
@@ -886,7 +890,7 @@ async function handleMyBookings(chatId: number, userId: number): Promise<void> {
     JOIN barbers b ON a.barber_id = b.id
     WHERE a.customer_telegram_id = ${userId}
     AND a.appointment_time > ${now.toISOString()}
-    AND a.status IN ('pending', 'confirmed')
+    AND a.status IN ('pending', 'confirmed', 'cancelled')
     ORDER BY a.appointment_time ASC
   ` as unknown as Array<any>;
 
@@ -899,7 +903,12 @@ async function handleMyBookings(chatId: number, userId: number): Promise<void> {
   for (const appt of appointments) {
     const dateTime = new Date(appt.appointment_time);
     const dateTimeStr = `${formatFullJalaliDate(dateTime)} - ${formatTime(dateTime)}`;
-    const status = appt.status === 'confirmed' ? '✅ تأیید شده' : '⏳ در انتظار';
+    let status = '⏳ در انتظار';
+    if (appt.status === 'confirmed') {
+      status = '✅ تأیید شده';
+    } else if (appt.status === 'cancelled') {
+      status = '❌ لغو شده';
+    }
     message += `\n\n• ${appt.service_name}\nآرایشگر: ${appt.barber_name}\n${dateTimeStr}\nوضعیت: ${status}`;
   }
 
@@ -993,6 +1002,358 @@ async function handleTodayCommand(chatId: number, userId: number, user: any): Pr
   }
 
   await sendMessage(chatId, message);
+}
+
+// Barber: manage upcoming appointments
+async function handleBarberManageAppointments(chatId: number, userId: number): Promise<void> {
+  const user = await getUserByTelegramId(userId);
+  if (!user || (user.role !== 'barber' && user.role !== 'super_admin')) {
+    await sendMessage(chatId, 'شما دسترسی به این بخش ندارید.');
+    return;
+  }
+
+  const barber = await sql`
+    SELECT id FROM barbers WHERE user_id = ${user.id}
+  ` as any[];
+
+  if (barber.length === 0) {
+    await sendMessage(chatId, 'شما به عنوان آرایشگر ثبت نشده‌اید.');
+    return;
+  }
+
+  const barberId = barber[0].id;
+  const now = new Date();
+
+  const appointments = await sql`
+    SELECT a.*, s.name as service_name
+    FROM appointments a
+    JOIN services s ON a.service_id = s.id
+    WHERE a.barber_id = ${barberId}
+    AND a.appointment_time > ${now.toISOString()}
+    AND a.status IN ('pending', 'confirmed')
+    ORDER BY a.appointment_time ASC
+    LIMIT 10
+  ` as any[];
+
+  if (appointments.length === 0) {
+    await sendMessage(chatId, 'نوبت آینده‌ای برای مدیریت وجود ندارد.');
+    return;
+  }
+
+  const buttons = appointments.map((appt) => {
+    const dateTime = new Date(appt.appointment_time);
+    const dateTimeStr = `${formatFullJalaliDate(dateTime).substring(0, 15)} ${formatTime(dateTime)}`;
+    const status = appt.status === 'confirmed' ? '✅' : '⏳';
+    return [{ 
+      text: `${status} ${appt.service_name} - ${dateTimeStr}`, 
+      callback_data: `ma_${appt.id}` 
+    }];
+  });
+  buttons.push([{ text: '🏠 بازگشت', callback_data: 'menu' }]);
+
+  const keyboard = { inline_keyboard: buttons };
+  await sendMessage(chatId, '📅 نوبت‌های آینده:\n\nیک نوبت را برای مدیریت انتخاب کنید:', keyboard);
+}
+
+// Barber: show appointment management options
+async function handleBarberAppointmentOptions(chatId: number, userId: number, appointmentId: number): Promise<void> {
+  const user = await getUserByTelegramId(userId);
+  if (!user || (user.role !== 'barber' && user.role !== 'super_admin')) {
+    return;
+  }
+
+  const barber = await sql`
+    SELECT id FROM barbers WHERE user_id = ${user.id}
+  ` as any[];
+
+  if (barber.length === 0) return;
+
+  const barberId = barber[0].id;
+
+  const appointment = await sql`
+    SELECT a.*, s.name as service_name
+    FROM appointments a
+    JOIN services s ON a.service_id = s.id
+    WHERE a.id = ${appointmentId}
+    AND a.barber_id = ${barberId}
+    AND a.status IN ('pending', 'confirmed')
+  ` as any[];
+
+  if (appointment.length === 0) {
+    await sendMessage(chatId, 'نوبت یافت نشد یا قبلاً لغو شده است.');
+    return;
+  }
+
+  const appt = appointment[0];
+  const dateTime = new Date(appt.appointment_time);
+  const dateTimeStr = `${formatFullJalaliDate(dateTime)} - ${formatTime(dateTime)}`;
+  const status = appt.status === 'confirmed' ? '✅ تأیید شده' : '⏳ در انتظار';
+
+  const text = `📋 جزئیات نوبت:\n\n` +
+    `خدمت: ${appt.service_name}\n` +
+    `زمان: ${dateTimeStr}\n` +
+    `نام: ${appt.customer_name}\n` +
+    `تلفن: ${appt.customer_phone}\n` +
+    `وضعیت: ${status}`;
+
+  const keyboard = {
+    inline_keyboard: [
+      [{ text: '🔄 جابه‌جایی', callback_data: `br_${appointmentId}` }],
+      [{ text: '❌ لغو نوبت', callback_data: `bc_${appointmentId}` }],
+      [{ text: '🏠 بازگشت', callback_data: 'menu' }],
+    ],
+  };
+
+  await sendMessage(chatId, text, keyboard);
+}
+
+// Barber: cancel appointment
+async function handleBarberCancelAppointment(chatId: number, userId: number, appointmentId: number): Promise<void> {
+  const user = await getUserByTelegramId(userId);
+  if (!user || (user.role !== 'barber' && user.role !== 'super_admin')) {
+    return;
+  }
+
+  const barber = await sql`
+    SELECT id FROM barbers WHERE user_id = ${user.id}
+  ` as any[];
+
+  if (barber.length === 0) return;
+
+  const barberId = barber[0].id;
+
+  const appointment = await sql`
+    SELECT a.*, s.name as service_name
+    FROM appointments a
+    JOIN services s ON a.service_id = s.id
+    WHERE a.id = ${appointmentId}
+    AND a.barber_id = ${barberId}
+    AND a.status IN ('pending', 'confirmed')
+  ` as any[];
+
+  if (appointment.length === 0) {
+    await sendMessage(chatId, 'نوبت یافت نشد یا قبلاً لغو شده است.');
+    return;
+  }
+
+  await sql`
+    UPDATE appointments
+    SET status = 'cancelled', updated_at = NOW()
+    WHERE id = ${appointmentId}
+  `;
+
+  await sendMessage(chatId, '✅ نوبت با موفقیت لغو شد.');
+
+  const appt = appointment[0];
+  if (appt.customer_telegram_id && appt.customer_telegram_id !== 0) {
+    await sendMessage(appt.customer_telegram_id, MESSAGES.appointmentCancelled);
+  }
+}
+
+// Barber: start reschedule flow
+async function handleBarberRescheduleStart(chatId: number, userId: number, appointmentId: number): Promise<void> {
+  const user = await getUserByTelegramId(userId);
+  if (!user || (user.role !== 'barber' && user.role !== 'super_admin')) {
+    return;
+  }
+
+  const barber = await sql`
+    SELECT id FROM barbers WHERE user_id = ${user.id}
+  ` as any[];
+
+  if (barber.length === 0) return;
+
+  const barberId = barber[0].id;
+
+  const appointment = await sql`
+    SELECT a.*, s.name as service_name, s.duration_minutes
+    FROM appointments a
+    JOIN services s ON a.service_id = s.id
+    WHERE a.id = ${appointmentId}
+    AND a.barber_id = ${barberId}
+    AND a.status IN ('pending', 'confirmed')
+  ` as any[];
+
+  if (appointment.length === 0) {
+    await sendMessage(chatId, 'نوبت یافت نشد یا قبلاً لغو شده است.');
+    return;
+  }
+
+  const appt = appointment[0];
+  await setUserState(userId, {
+    step: 'date',
+    barberId: barberId,
+    serviceId: appt.service_id,
+    serviceName: appt.service_name,
+    duration: appt.duration_minutes,
+    barberCode: `reschedule_${appointmentId}`,
+  });
+
+  const openDays = await getNextOpenDays(barberId, 14);
+  const buttons = openDays.slice(0, 10).map((date) => [{
+    text: formatFullJalaliDate(date),
+    callback_data: `rd_${appointmentId}_${date.toISOString()}`,
+  }]);
+  buttons.push([{ text: '🏠 بازگشت', callback_data: 'menu' }]);
+
+  const keyboard = { inline_keyboard: buttons };
+  await sendMessage(chatId, 'تاریخ جدید را انتخاب کنید:', keyboard);
+}
+
+// Barber: reschedule date selected
+async function handleBarberRescheduleDate(
+  chatId: number,
+  userId: number,
+  appointmentId: number,
+  dateStr: string
+): Promise<void> {
+  const state = await getUserState(userId);
+  if (!state || !state.duration || !state.barberId) {
+    await showRolePicker(chatId, userId);
+    return;
+  }
+
+  const date = new Date(dateStr);
+  const slots = await getAvailableSlots(state.barberId, date, state.duration);
+
+  if (slots.length === 0) {
+    await sendMessage(chatId, MESSAGES.noSlotsAvailable);
+    return;
+  }
+
+  state.step = 'time';
+  state.date = dateStr;
+  await setUserState(userId, state);
+
+  const buttons = slots.map((slot) => [{
+    text: formatTime(slot),
+    callback_data: `rt_${appointmentId}_${slot.toISOString()}`,
+  }]);
+  buttons.push([{ text: '🏠 بازگشت', callback_data: 'menu' }]);
+
+  const keyboard = { inline_keyboard: buttons };
+  await sendMessage(chatId, `زمان جدید را برای ${formatFullJalaliDate(date)} انتخاب کنید:`, keyboard);
+}
+
+// Barber: reschedule time selected
+async function handleBarberRescheduleTime(
+  chatId: number,
+  userId: number,
+  appointmentId: number,
+  timeStr: string
+): Promise<void> {
+  const user = await getUserByTelegramId(userId);
+  if (!user || (user.role !== 'barber' && user.role !== 'super_admin')) {
+    return;
+  }
+
+  const barber = await sql`
+    SELECT id FROM barbers WHERE user_id = ${user.id}
+  ` as any[];
+
+  if (barber.length === 0) return;
+
+  const barberId = barber[0].id;
+
+  const appointment = await sql`
+    SELECT a.*, s.name as service_name, s.duration_minutes
+    FROM appointments a
+    JOIN services s ON a.service_id = s.id
+    WHERE a.id = ${appointmentId}
+    AND a.barber_id = ${barberId}
+    AND a.status IN ('pending', 'confirmed')
+  ` as any[];
+
+  if (appointment.length === 0) {
+    await sendMessage(chatId, 'نوبت یافت نشد یا قبلاً لغو شده است.');
+    await clearUserState(userId);
+    return;
+  }
+
+  const appt = appointment[0];
+  const newTime = new Date(timeStr);
+  const duration = appt.duration_minutes;
+
+  // Check slot availability excluding current appointment
+  const endTime = new Date(newTime.getTime() + duration * 60000);
+  const weekday = newTime.getDay();
+  
+  const hours = await sql`
+    SELECT * FROM working_hours 
+    WHERE barber_id = ${barberId} AND weekday = ${weekday}
+  ` as any[];
+
+  if (hours.length === 0 || !hours[0].is_open) {
+    await sendMessage(chatId, 'در این روز ساعات کاری تعریف نشده است.');
+    await clearUserState(userId);
+    return;
+  }
+
+  const timeHHMM = newTime.toLocaleTimeString('en-US', {
+    timeZone: 'Asia/Tehran',
+    hour12: false,
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+
+  const endTimeHHMM = endTime.toLocaleTimeString('en-US', {
+    timeZone: 'Asia/Tehran',
+    hour12: false,
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+
+  if (timeHHMM < hours[0].start_time || endTimeHHMM > hours[0].end_time) {
+    await sendMessage(chatId, 'زمان انتخاب شده خارج از ساعات کاری است.');
+    await clearUserState(userId);
+    return;
+  }
+
+  const blockedSlots = await sql`
+    SELECT * FROM blocked_slots
+    WHERE barber_id = ${barberId}
+    AND (start_time, end_time) OVERLAPS (${newTime.toISOString()}, ${endTime.toISOString()})
+  ` as any[];
+
+  if (blockedSlots.length > 0) {
+    await sendMessage(chatId, 'زمان انتخاب شده مسدود است.');
+    await clearUserState(userId);
+    return;
+  }
+
+  const overlapping = await sql`
+    SELECT * FROM appointments
+    WHERE barber_id = ${barberId}
+    AND id != ${appointmentId}
+    AND status IN ('pending', 'confirmed')
+    AND (
+      appointment_time < ${endTime.toISOString()}
+      AND (appointment_time + (duration_minutes || ' minutes')::interval) > ${newTime.toISOString()}
+    )
+  ` as any[];
+
+  if (overlapping.length > 0) {
+    await sendMessage(chatId, 'زمان انتخاب شده در تداخل با نوبت دیگری است.');
+    await clearUserState(userId);
+    return;
+  }
+
+  await sql`
+    UPDATE appointments
+    SET appointment_time = ${newTime.toISOString()}, updated_at = NOW()
+    WHERE id = ${appointmentId}
+  `;
+
+  await clearUserState(userId);
+  await sendMessage(chatId, '✅ نوبت با موفقیت جابه‌جا شد.');
+
+  if (appt.customer_telegram_id && appt.customer_telegram_id !== 0) {
+    const newTimeFormatted = `${formatFullJalaliDate(newTime)} - ${formatTime(newTime)}`;
+    await sendMessage(
+      appt.customer_telegram_id,
+      MESSAGES.appointmentRescheduled(appt.service_name, newTimeFormatted)
+    );
+  }
 }
 
 // Phone validation (Iranian mobile)
@@ -1145,6 +1506,34 @@ export async function POST(request: Request): Promise<Response> {
             }
           }
         }
+      } else if (data.startsWith('ma_')) {
+        const appointmentId = parseInt(data.replace('ma_', ''));
+        await handleBarberAppointmentOptions(chatId, userId, appointmentId);
+      } else if (data.startsWith('bc_')) {
+        const appointmentId = parseInt(data.replace('bc_', ''));
+        const keyboard = {
+          inline_keyboard: [
+            [{ text: '✅ تأیید لغو', callback_data: `bcc_${appointmentId}` }],
+            [{ text: '❌ بازگشت', callback_data: 'menu' }],
+          ],
+        };
+        await sendMessage(chatId, 'آیا مطمئن هستید که می‌خواهید این نوبت را لغو کنید؟', keyboard);
+      } else if (data.startsWith('bcc_')) {
+        const appointmentId = parseInt(data.replace('bcc_', ''));
+        await handleBarberCancelAppointment(chatId, userId, appointmentId);
+      } else if (data.startsWith('br_')) {
+        const appointmentId = parseInt(data.replace('br_', ''));
+        await handleBarberRescheduleStart(chatId, userId, appointmentId);
+      } else if (data.startsWith('rd_')) {
+        const parts = data.replace('rd_', '').split('_');
+        const appointmentId = parseInt(parts[0]);
+        const dateStr = parts.slice(1).join('_');
+        await handleBarberRescheduleDate(chatId, userId, appointmentId, dateStr);
+      } else if (data.startsWith('rt_')) {
+        const parts = data.replace('rt_', '').split('_');
+        const appointmentId = parseInt(parts[0]);
+        const timeStr = parts.slice(1).join('_');
+        await handleBarberRescheduleTime(chatId, userId, appointmentId, timeStr);
       }
     }
 
