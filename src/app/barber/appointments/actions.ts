@@ -125,3 +125,179 @@ export async function rejectAppointment(appointmentId: number) {
     return { success: false, error: 'خطا در رد نوبت. لطفاً دوباره تلاش کنید.' };
   }
 }
+
+export async function cancelAppointment(appointmentId: number) {
+  try {
+    const user = await requireBarber();
+    
+    // Get barber ID
+    const barber = await sql`
+      SELECT id FROM barbers WHERE user_id = ${user.id}
+    ` as any[];
+    
+    if (barber.length === 0) {
+      return { success: false, error: 'شما به عنوان آرایشگر ثبت نشده‌اید.' };
+    }
+    
+    const barberId = barber[0].id;
+    
+    // Verify the appointment belongs to this barber (can cancel pending or confirmed)
+    const appointment = await sql`
+      SELECT a.*, s.name as service_name FROM appointments a
+      JOIN services s ON a.service_id = s.id
+      WHERE a.id = ${appointmentId} 
+        AND a.barber_id = ${barberId} 
+        AND a.status IN ('pending', 'confirmed')
+    ` as any[];
+    
+    if (appointment.length === 0) {
+      return { success: false, error: 'نوبت یافت نشد یا قبلاً لغو شده است.' };
+    }
+    
+    // Update status to cancelled
+    await sql`
+      UPDATE appointments
+      SET status = 'cancelled', updated_at = NOW()
+      WHERE id = ${appointmentId}
+    `;
+    
+    // Notify customer on Telegram (skip if walk-in with telegram_id = 0)
+    const appt = appointment[0];
+    if (appt.customer_telegram_id && appt.customer_telegram_id !== 0) {
+      await sendTelegramMessage(appt.customer_telegram_id, MESSAGES.appointmentCancelled);
+    }
+    
+    // Revalidate barber pages
+    revalidatePath('/barber');
+    revalidatePath('/barber/calendar');
+    revalidatePath('/barber/customers');
+    
+    return { success: true };
+  } catch (error) {
+    console.error('[cancelAppointment] Error:', error);
+    return { success: false, error: 'خطا در لغو نوبت. لطفاً دوباره تلاش کنید.' };
+  }
+}
+
+export async function rescheduleAppointment(appointmentId: number, newDateTime: string) {
+  try {
+    const user = await requireBarber();
+    
+    // Get barber ID
+    const barber = await sql`
+      SELECT id FROM barbers WHERE user_id = ${user.id}
+    ` as any[];
+    
+    if (barber.length === 0) {
+      return { success: false, error: 'شما به عنوان آرایشگر ثبت نشده‌اید.' };
+    }
+    
+    const barberId = barber[0].id;
+    
+    // Get the appointment (can reschedule pending or confirmed)
+    const appointment = await sql`
+      SELECT a.*, s.name as service_name FROM appointments a
+      JOIN services s ON a.service_id = s.id
+      WHERE a.id = ${appointmentId} 
+        AND a.barber_id = ${barberId} 
+        AND a.status IN ('pending', 'confirmed')
+    ` as any[];
+    
+    if (appointment.length === 0) {
+      return { success: false, error: 'نوبت یافت نشد یا قبلاً لغو شده است.' };
+    }
+    
+    const appt = appointment[0];
+    
+    // Check slot availability (excluding this appointment)
+    const newTime = new Date(newDateTime);
+    const duration = appt.duration_minutes;
+    const endTime = new Date(newTime.getTime() + duration * 60000);
+    
+    // Check working hours
+    const weekday = newTime.getDay();
+    const hours = await sql`
+      SELECT * FROM working_hours 
+      WHERE barber_id = ${barberId} AND weekday = ${weekday}
+    ` as any[];
+    
+    if (hours.length === 0 || !hours[0].is_open) {
+      return { success: false, error: 'در این روز ساعات کاری تعریف نشده است.' };
+    }
+    
+    const timeStr = newTime.toLocaleTimeString('en-US', {
+      timeZone: 'Asia/Tehran',
+      hour12: false,
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+    
+    const endTimeStr = endTime.toLocaleTimeString('en-US', {
+      timeZone: 'Asia/Tehran',
+      hour12: false,
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+    
+    if (timeStr < hours[0].start_time || endTimeStr > hours[0].end_time) {
+      return { success: false, error: 'زمان انتخاب شده خارج از ساعات کاری است.' };
+    }
+    
+    // Check blocked slots
+    const blockedSlots = await sql`
+      SELECT * FROM blocked_slots
+      WHERE barber_id = ${barberId}
+      AND (start_time, end_time) OVERLAPS (${newTime.toISOString()}, ${endTime.toISOString()})
+    ` as any[];
+    
+    if (blockedSlots.length > 0) {
+      return { success: false, error: 'زمان انتخاب شده مسدود است.' };
+    }
+    
+    // Check overlapping appointments (excluding current appointment)
+    const overlapping = await sql`
+      SELECT * FROM appointments
+      WHERE barber_id = ${barberId}
+      AND id != ${appointmentId}
+      AND status IN ('pending', 'confirmed')
+      AND (
+        appointment_time < ${endTime.toISOString()}
+        AND (appointment_time + (duration_minutes || ' minutes')::interval) > ${newTime.toISOString()}
+      )
+    ` as any[];
+    
+    if (overlapping.length > 0) {
+      return { success: false, error: 'زمان انتخاب شده در تداخل با نوبت دیگری است.' };
+    }
+    
+    // Update appointment time
+    await sql`
+      UPDATE appointments
+      SET appointment_time = ${newTime.toISOString()}, updated_at = NOW()
+      WHERE id = ${appointmentId}
+    `;
+    
+    // Notify customer on Telegram (skip if walk-in with telegram_id = 0)
+    if (appt.customer_telegram_id && appt.customer_telegram_id !== 0) {
+      const newTimeFormatted = newTime.toLocaleString('fa-IR', {
+        timeZone: 'Asia/Tehran',
+        dateStyle: 'full',
+        timeStyle: 'short',
+      });
+      await sendTelegramMessage(
+        appt.customer_telegram_id, 
+        MESSAGES.appointmentRescheduled(appt.service_name, newTimeFormatted)
+      );
+    }
+    
+    // Revalidate barber pages
+    revalidatePath('/barber');
+    revalidatePath('/barber/calendar');
+    revalidatePath('/barber/customers');
+    
+    return { success: true };
+  } catch (error) {
+    console.error('[rescheduleAppointment] Error:', error);
+    return { success: false, error: 'خطا در جابه‌جایی نوبت. لطفاً دوباره تلاش کنید.' };
+  }
+}
